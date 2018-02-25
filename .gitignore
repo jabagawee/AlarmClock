@@ -50,3 +50,6 @@ local.properties
 .cache-main
 .scala_dependencies
 .worksheet
+
+# Arduino Eclipse plugin build files
+*/Release/
