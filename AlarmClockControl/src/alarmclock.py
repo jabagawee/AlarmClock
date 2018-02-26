@@ -16,15 +16,18 @@ alarmclock is a script to control an Arduino/Raspberry Pi alarm clock.
 
 import datetime
 import mpd
-import platform
-import serial
-import sys
-import time
-
 import os
+import sys
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
+
+from twisted.internet import reactor
+from twisted.internet import task
+from twisted.internet.serialport import SerialPort
+from twisted.protocols.basic import LineReceiver
+from twisted.web import server
+from twisted.web.server import resource
 
 __all__ = []
 __version__ = 0.1
@@ -71,169 +74,172 @@ def mpdClose(client):
     client.close()
     client.disconnect()  
 
-def alarmclock(port, mpd, alarm):
-    state = OFF
-    ser = serial.Serial()
-    ser.port = port
-    ser.baudrate = 9600
-    ser.timeout = 1
-    if platform.system() == 'Windows':
-        # Disable the DTR on Windows so the Arduino doesn't reset
-        # On Linux, the serial port should be configured to diable
-        # DTR with:  stty -F /dev/ttyACM0 -hupcl
-        ser.setDTR(False)
-    ser.open()
-    
-    time.sleep(2)
-    next_update = 0;
-    last_update = datetime.datetime.now()
-    sleep_time = None
-    snooze_time = None
-    alarm_off_time = None
-    relay = False
-    buzzer = False
-    lights = False
-    
-    while 1:
-        ser_output = ser.readline()
-        if ser_output:
-            sys.stdout.write('Received: %s\n' % (ser_output,))
-            if ser_output[:1] == SLEEP_BUTTON:
-                if state == OFF:
-                    state = SLEEP
-                    sleep_time = datetime.datetime.now() + datetime.timedelta(hours=1)
-                    relay = True
-                    lights = False
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning on sleep: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        playKqed(client)
-                        mpdClose(client)
-                elif state == SLEEP:
-                    sleep_time = datetime.datetime.now() + datetime.timedelta(hours=1)
-                elif state == ALARM or state == SNOOZE:
-                    state = OFF
-                    alarm_off_time = None
-                    relay = False
-                    lights = False
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning off alarm: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        stopPlaying(client)
-                        mpdClose(client)
-                    
-            if ser_output[:1] == SNOOZE_BUTTON:
-                if state == ALARM:
-                    state = SNOOZE
-                    snooze_time = datetime.datetime.now() + datetime.timedelta(minutes=9)
-                    relay = False
-                    lights = False
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning on snooze: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        stopPlaying(client)
-                        mpdClose(client)
-                elif state == SNOOZE:
-                    snooze_time = datetime.datetime.now() + datetime.timedelta(minutes=9)
-                elif state == SLEEP:
-                    state = OFF
-                    sleep_time = None
-                    relay = False
-                    lights = False
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning off sleep: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        stopPlaying(client)
-                        mpdClose(client)
 
-        else:
-            current_time = datetime.datetime.now()
-            if state == OFF:
-                alarm_time = current_time.replace(hour=alarm.hour, minute=alarm.minute, second=alarm.second)
-                if last_update < alarm_time and alarm_time <= current_time:
-                    state = ALARM
-                    alarm_off_time = datetime.datetime.now() + datetime.timedelta(hours=1)
-                    relay = True
-                    lights = True
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning on alarm: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        playKqed(client)
-                        mpdClose(client)
-            elif state == SLEEP:
-                if last_update < sleep_time and sleep_time <= current_time:
-                    state = OFF
-                    sleep_time = None
-                    relay = False
-                    lights = False
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning off after sleep: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        stopPlaying(client)
-                        mpdClose(client)
-            elif state == SNOOZE:
-                if last_update < snooze_time and snooze_time <= current_time:
-                    state = ALARM
-                    snooze_time = None
-                    relay = True
-                    lights = True
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Resuming alarm after snooze: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        playKqed(client)
-                        mpdClose(client)
-                if last_update < alarm_off_time and alarm_off_time <= current_time:
-                    state = OFF
-                    snooze_time = None
-                    alarm_off_time = None
-                    relay = False
-                    lights = False
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning off alarm: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        stopPlaying(client)
-                        mpdClose(client)
-            elif state == ALARM:
-                if last_update < alarm_off_time and alarm_off_time <= current_time:
-                    state = OFF
-                    alarm_off_time = None
-                    relay = False
-                    lights = False
-                    new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-                    sys.stdout.write('Turning off alarm: ' + new_time)
-                    ser.write(new_time.encode('utf-8'))
-                    if (mpd):
-                        client = mpdConnect()
-                        stopPlaying(client)
-                        mpdClose(client)
-            last_update = current_time
-            
+class SerialProtocol(LineReceiver):
+    """
+    Arduino serial communication protocol.
+    """
+    
+    def __init__(self, mpd, alarm):
+        super(SerialProtocol, self).__init__()
+        self.mpd = mpd
+        self.alarm = alarm
+        self.state = OFF
+        self.relay = False
+        self.buzzer = False
+        self.lights = False
+        self.sleep_time = None
+        self.snooze_time = None
+        self.alarm_off_time = None
+        self.alarm_time = None
+
+    def next_alarm(self):
+        current_time = datetime.datetime.now()
+        next_alarm_day = current_time
+        alarm_time = next_alarm_day.replace(hour=self.alarm.hour, minute=self.alarm.minute, second=self.alarm.second)
+        delta = alarm_time - current_time
+        if delta < datetime.timedelta(seconds=60):
+            next_alarm_day = current_time + datetime.timedelta(days=1)
+            alarm_time = next_alarm_day.replace(hour=self.alarm.hour, minute=self.alarm.minute, second=self.alarm.second)
+            delta = alarm_time - current_time
+        return delta
         
-        if next_update <= 0:
-            new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(relay)) + str(int(buzzer)) + str(int(lights)) + '\n'
-            sys.stdout.write('Updating to new time: ' + new_time)
-            ser.write(new_time.encode('utf-8'))
-            next_update = 60
-    
-        next_update = next_update - 1
-    
-    ser.close()
+    def connectionMade(self):
+        print('Serial port connected.')
+        self.alarm_time = reactor.callLater(float(self.next_alarm().total_seconds()), self.alarm_sounds)
+        self.sendState()
+
+    def lineReceived(self, line):
+        print("Serial RX: {0}".format(line))
+        if line[:1] == SLEEP_BUTTON:
+            if self.state == OFF:
+                self.state = SLEEP
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off)
+                self.relay = True
+                self.lights = False
+                sys.stdout.write('Turning on sleep\n')
+                self.sendState()
+                if (self.mpd):
+                    client = mpdConnect()
+                    playKqed(client)
+                    mpdClose(client)
+            elif self.state == SLEEP:
+                if self.sleep_time is not None and self.sleep_time.active():
+                    self.sleep_time.cancel()
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off)
+            elif self.state == ALARM or self.state == SNOOZE:
+                self.state = OFF
+                if self.alarm_off_time is not None and self.alarm_off_time.active():
+                    self.alarm_off_time.cancel()
+                self.alarm_off_time = None
+                if self.snooze_time is not None and self.snooze_time.active():
+                    self.snooze_time.cancel()
+                self.snooze_time = None
+                self.relay = False
+                self.lights = False
+                sys.stdout.write('Turning off alarm\n')
+                self.sendState()
+                if (self.mpd):
+                    client = mpdConnect()
+                    stopPlaying(client)
+                    mpdClose(client)
+                
+        if line[:1] == SNOOZE_BUTTON:
+            if self.state == ALARM:
+                self.state = SNOOZE
+                if self.snooze_time is not None and self.snooze_time.active():
+                    self.snooze_time.cancel()
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over)
+                self.relay = False
+                self.lights = False
+                sys.stdout.write('Turning on snooze\n')
+                self.sendState()
+                if (self.mpd):
+                    client = mpdConnect()
+                    stopPlaying(client)
+                    mpdClose(client)
+            elif self.state == SNOOZE:
+                if self.snooze_time is not None and self.snooze_time.active():
+                    self.snooze_time.cancel()
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over)
+            elif self.state == SLEEP:
+                self.state = OFF
+                if self.sleep_time is not None and self.sleep_time.active():
+                    self.sleep_time.cancel()
+                self.sleep_time = None
+                self.relay = False
+                self.lights = False
+                sys.stdout.write('Turning off sleep\n')
+                self.sendState()
+                if (self.mpd):
+                    client = mpdConnect()
+                    stopPlaying(client)
+                    mpdClose(client)
+
+    def alarm_sounds(self):
+        self.alarm_time = reactor.callLater(self.next_alarm().total_seconds(), self.alarm_sounds)
+        if self.state != OFF:
+            sys.stderr.write('Bad state ' + str(self.state) + ', expected ' + str(OFF))
+            return
+        self.state = ALARM
+        self.alarm_off_time = reactor.callLater(3600.0, self.everything_off)
+        self.relay = True
+        self.lights = True
+        sys.stdout.write('Turning on alarm\n')
+        self.sendState()
+        if (self.mpd):
+            client = mpdConnect()
+            playKqed(client)
+            mpdClose(client)
+
+    def snooze_over(self):
+        if self.state != SNOOZE:
+            sys.stderr.write('Bad state ' + str(self.state) + ', expected ' + str(SNOOZE))
+            return
+        self.state = ALARM
+        self.snooze_time = None
+        self.relay = True
+        self.lights = True
+        sys.stdout.write('Resuming alarm after snooze\n')
+        self.sendState()
+        if (self.mpd):
+            client = mpdConnect()
+            playKqed(client)
+            mpdClose(client)
+
+    def everything_off(self):
+        if self.state == SLEEP:
+            self.sleep_time = None
+            sys.stdout.write('Turning off radio after sleep\n')
+        elif self.state == SNOOZE:
+            if self.snooze_time is not None and self.snooze_time.active():
+                self.snooze_time.cancel()
+            self.snooze_time = None
+            self.alarm_off_time = None
+            sys.stdout.write('Turning off alarm\n')
+        elif self.state == ALARM:
+            self.alarm_off_time = None
+            sys.stdout.write('Turning off alarm\n')
+        else:
+            sys.stderr.write('Bad state ' + str(self.state) + ', expected ' + str(SLEEP))
+            return
+        self.state = OFF
+        self.relay = False
+        self.lights = False
+        self.sendState()
+        if (self.mpd):
+            client = mpdConnect()
+            stopPlaying(client)
+            mpdClose(client)
+
+    def sendState(self):
+        """
+        This method is exported as RPC and can be called by connected clients
+        """
+        new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(self.relay)) + str(int(self.buzzer)) + str(int(self.lights)) + '\n'
+        sys.stdout.write('Sending time: ' + new_time)
+        self.transport.write(new_time.encode('utf-8'))
+
 
 class CLIError(Exception):
     '''Generic exception to raise and log different fatal errors.'''
@@ -244,6 +250,13 @@ class CLIError(Exception):
         return self.msg
     def __unicode__(self):
         return self.msg
+
+
+class WebInterface(resource.Resource):
+    isLeaf = True
+    def render_GET(self, request):
+        return "<html>Hello, world!</html>".encode('utf-8')
+
 
 def main(argv=None): # IGNORE:C0111
     '''Command line options.'''
@@ -280,6 +293,8 @@ USAGE
         parser.add_argument("-m", "--mpd", dest="mpd", action="store_true", default=False, help="enable MPD server [default: %(default)s]")
         parser.add_argument("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %(default)s]")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
+        parser.add_argument("--web", type=int, default=8000,
+                            help='Web port to use for embedded Web server. Use 0 to disable.')
         parser.add_argument(dest="port", help="serial port to connect to [default: %(default)s]", nargs='?', default="COM3")
 
         # Process arguments
@@ -290,7 +305,44 @@ USAGE
         #if verbose > 0:
         #    print("Verbose mode on")
 
-        alarmclock(args.port, args.mpd, datetime.time(args.hour, args.minute))
+        print("Using Twisted reactor {0}".format(reactor.__class__))
+    
+        # create embedded web server for static files
+        if args.web:
+            reactor.listenTCP(args.web, server.Site(WebInterface()))
+    
+        serialProtocol = SerialProtocol(args.mpd, datetime.time(args.hour, args.minute))
+
+        print('About to open serial port {0} [{1} baud] ..'.format(args.port, 9600))
+        try:
+            serialPort = SerialPort(serialProtocol, args.port, reactor, baudrate=9600)
+        except Exception as e:
+            print('Could not open serial port: {0}'.format(e))
+            return 1
+
+        loop = task.LoopingCall(serialProtocol.sendState)
+
+        def cbLoopDone(result):
+            """
+            Called when loop was stopped with success.
+            """
+            print("Loop done: " + result)
+        
+        def ebLoopFailed(failure):
+            """
+            Called when loop execution failed.
+            """
+            print(failure.getBriefTraceback())
+            
+        # Start looping every 10 seconds.
+        loopDeferred = loop.start(10.0)
+        
+        # Add callbacks for stop and failure.
+        loopDeferred.addCallback(cbLoopDone)
+        loopDeferred.addErrback(ebLoopFailed)
+    
+        # start the component and the Twisted reactor ..
+        reactor.run()
         
         return 0
     except KeyboardInterrupt:
