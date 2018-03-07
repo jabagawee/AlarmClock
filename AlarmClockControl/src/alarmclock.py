@@ -22,6 +22,8 @@ import sys
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
 
+from crontab import CronTab
+
 from twisted.internet import reactor
 from twisted.internet import task
 from twisted.internet.serialport import SerialPort
@@ -75,15 +77,33 @@ def mpdClose(client):
     client.disconnect()  
 
 
+class Alarms(object):
+    """
+    Container for multiple recurring alarms.
+    """
+    
+    def __init__(self, initial_alarm):
+        self._alarms = {initial_alarm: CronTab(initial_alarm)}
+    
+    def update(self, alarms):
+        self._alarms = {alarm: CronTab(alarm) for alarm in alarms}
+
+    def next_alarm(self):
+        return min([alarm.next(default_utc=False) for alarm in self._alarms.values()])
+
+    def get_alarm_crontabs(self):
+        return [self._alarms[cron] for cron in self._alarms.keys()]
+    
+
 class SerialProtocol(LineReceiver):
     """
     Arduino serial communication protocol.
     """
     
-    def __init__(self, mpd, alarm):
+    def __init__(self, mpd, alarms):
         super(SerialProtocol, self).__init__()
         self.mpd = mpd
-        self.alarm = alarm
+        self.alarms = alarms
         self.state = OFF
         self.relay = False
         self.buzzer = False
@@ -92,22 +112,18 @@ class SerialProtocol(LineReceiver):
         self.snooze_time = None
         self.alarm_off_time = None
         self.alarm_time = None
-
-    def next_alarm(self):
-        current_time = datetime.datetime.now()
-        next_alarm_day = current_time
-        alarm_time = next_alarm_day.replace(hour=self.alarm.hour, minute=self.alarm.minute, second=self.alarm.second)
-        delta = alarm_time - current_time
-        if delta < datetime.timedelta(seconds=60):
-            next_alarm_day = current_time + datetime.timedelta(days=1)
-            alarm_time = next_alarm_day.replace(hour=self.alarm.hour, minute=self.alarm.minute, second=self.alarm.second)
-            delta = alarm_time - current_time
-        return delta
         
     def connectionMade(self):
         print('Serial port connected.')
-        self.alarm_time = reactor.callLater(float(self.next_alarm().total_seconds()), self.alarm_sounds)
+        self.rescheduleAlarm()
         self.sendState()
+        
+    def rescheduleAlarm(self):
+        if self.alarm_time is not None and self.alarm_time.active():
+            self.alarm_time.cancel()
+        next_alarm = self.alarms.next_alarm()
+        sys.stdout.write('Scheduling next alarm in: ' + str(next_alarm) + ' seconds\n')
+        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds)
 
     def lineReceived(self, line):
         print("Serial RX: {0}".format(line))
@@ -177,7 +193,7 @@ class SerialProtocol(LineReceiver):
                     mpdClose(client)
 
     def alarm_sounds(self):
-        self.alarm_time = reactor.callLater(self.next_alarm().total_seconds(), self.alarm_sounds)
+        self.rescheduleAlarm()
         if self.state != OFF:
             sys.stderr.write('Bad state ' + str(self.state) + ', expected ' + str(OFF))
             return
@@ -241,21 +257,40 @@ class SerialProtocol(LineReceiver):
         self.transport.write(new_time.encode('utf-8'))
 
 
-class CLIError(Exception):
-    '''Generic exception to raise and log different fatal errors.'''
-    def __init__(self, msg):
-        super(CLIError).__init__(type(self))
-        self.msg = "E: %s" % msg
-    def __str__(self):
-        return self.msg
-    def __unicode__(self):
-        return self.msg
-
-
 class WebInterface(resource.Resource):
     isLeaf = True
+    
+    def __init__(self, alarms, serialProtocol):
+        super(WebInterface, self).__init__()
+        self._alarms = alarms
+        self._serialProtocol = serialProtocol
+
     def render_GET(self, request):
-        return "<html>Hello, world!</html>".encode('utf-8')
+        return self.render_form()
+
+    def render_form(self):
+        page = ['<html>',
+                '<body>',
+                '  <p>Current alarms:</p>',
+                '  <form method="POST">',
+                '  <ul>']
+        i = 0
+        for alarm in self._alarms.get_alarm_crontabs():
+            page.append('    <li><input type="text" name="alarm%s" value="%s"></li>' % (i, alarm))
+        page.append('  </ul>')
+        page.append('  <input type="submit" value="Submit">')
+        page.append('  </form>')
+        page.append('</body></html>')
+        return ('\n'.join(page)).encode('utf-8')
+
+    def render_POST(self, request):
+        new_alarms = [request.args[arg][0].decode('utf-8')
+                      for arg in request.args.keys()
+                      if arg.startswith('alarm'.encode('utf-8'))]
+        sys.stdout.write('New alarms received: ' + '   '.join(new_alarms) + '\n')
+        self._alarms.update(new_alarms)
+        self._serialProtocol.rescheduleAlarm()
+        return self.render_form()
 
 
 def main(argv=None): # IGNORE:C0111
@@ -288,8 +323,7 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-H", "--hour", dest="hour", type=int, default=8, help="alarm hour (24-hour clock) [default: %(default)s]")
-        parser.add_argument("-M", "--minute", dest="minute", type=int, default=30, help="alarm minute [default: %(default)s]")
+        parser.add_argument("-a", "--alarm", dest="alarm", type=str, default="30 8 * * *", help="alarm time in cron format [default: '%(default)s']")
         parser.add_argument("-m", "--mpd", dest="mpd", action="store_true", default=False, help="enable MPD server [default: %(default)s]")
         parser.add_argument("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %(default)s]")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
@@ -306,12 +340,14 @@ USAGE
         #    print("Verbose mode on")
 
         print("Using Twisted reactor {0}".format(reactor.__class__))
+        
+        alarms = Alarms(args.alarm)
     
-        # create embedded web server for static files
+        serialProtocol = SerialProtocol(args.mpd, alarms)
+    
+        # Create embedded web server to manage the alarms.
         if args.web:
-            reactor.listenTCP(args.web, server.Site(WebInterface()))
-    
-        serialProtocol = SerialProtocol(args.mpd, datetime.time(args.hour, args.minute))
+            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol)))
 
         print('About to open serial port {0} [{1} baud] ..'.format(args.port, 9600))
         try:
