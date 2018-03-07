@@ -9,11 +9,18 @@ int clk = 4; // 6;
 int latch = 5;
 int data = 6; // 4;
 int RELAY = 11; // 3;
-int RLED = 12; // 8;
-int GLED = A3;
 int LBUTTON = 9; // 2;
 int RBUTTON = 10; // 7;
 int BUZZER = 13;
+
+int UNIQUE_LEDS = 7;
+int NUM_LEDS = 12;
+int LEDS[12] = {A0, A1, A2, A3, A4, A5, 12, A5, A4, A3, A2, A1};
+int led_count = 0;
+int NUM_LED_CYCLES = 4;
+int LED_CYCLES[4] = {0, 1, 2, 0};
+int LED_CYCLE_VALUES[4] = {HIGH, HIGH, HIGH, LOW};
+int led_cycle_count = 0;
 
 // Current digit being output
 int count = 0;
@@ -56,12 +63,14 @@ int get_number(int digit);
 void set_number(int digit, int value);
 void cathode_high();
 void add();
+void updateRelay();
 time_t requestSync();
 
 void setup() {
   pinMode(RELAY, OUTPUT);
-  pinMode(RLED, OUTPUT);
-  pinMode(GLED, OUTPUT);
+  for (int i=0; i < UNIQUE_LEDS; i++) {
+    pinMode(LEDS[i], OUTPUT);
+  }
   pinMode(LBUTTON, INPUT_PULLUP);
   pinMode(RBUTTON, INPUT_PULLUP);
   pinMode(CA_1, OUTPUT);
@@ -110,6 +119,20 @@ void loop() {
   count++;
   if (count == 4) {
     count = 0;
+
+    if (lights) {
+      digitalWrite(
+          LEDS[(led_count + LED_CYCLES[led_cycle_count]) % NUM_LEDS],
+          LED_CYCLE_VALUES[led_cycle_count]);
+    }
+    led_cycle_count++;
+    if (led_cycle_count == NUM_LED_CYCLES) {
+      led_cycle_count = 0;
+      led_count++;
+      if (led_count == NUM_LEDS) {
+        led_count = 0;
+      }
+    }
   }
 }
 
@@ -164,10 +187,14 @@ void showNewData() {
             lights = true;
           } else {
             lights = false;
+            for (int i=0; i < UNIQUE_LEDS; i++) {
+              digitalWrite(LEDS[i], LOW);
+            }
           }
         }
       }
     }
+    updateRelay();
 	}
 }
 
@@ -223,16 +250,8 @@ void add()
 {
   if (alternatingSeconds) {
     alternatingSeconds = false;
-    if (lights) {
-      digitalWrite(RLED, HIGH);
-    }
-    digitalWrite(GLED, LOW);
   } else {
     alternatingSeconds = true;
-    digitalWrite(RLED, LOW);
-    if (lights) {
-      digitalWrite(GLED, HIGH);
-    }
   }
   if (second() == 0) {
     writeCurrentTime();
@@ -241,6 +260,10 @@ void add()
     // tone(BUZZER, 523, 1100);
     tone(BUZZER, 1047, 1100);
   }
+  updateRelay();
+}
+
+void updateRelay() {
   if (relay) {
     digitalWrite(RELAY, HIGH);
   } else {
