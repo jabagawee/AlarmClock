@@ -40,6 +40,7 @@ DEBUG = 0
 TESTRUN = 0
 PROFILE = 0
 KQED = 'https://streams2.kqed.org/kqedradio'
+NUM_ALARMS_DISPLAY = 10
 
 # Buttons
 SLEEP_BUTTON = b'L'
@@ -91,6 +92,22 @@ class Alarms(object):
     def next_alarm(self):
         return min([alarm.next(default_utc=False) for alarm in self._alarms.values()])
 
+    def next_alarms(self, num_alarms, now=None):
+        if now is None:
+            now = datetime.datetime.now()
+        result = []
+
+        for _ in range(num_alarms):
+            now += datetime.timedelta(seconds=min(
+                alarm.next(now=now, default_utc=False)
+                for alarm in self._alarms.values()))
+            result.append(now)
+
+        return result
+
+    def num_alarms(self):
+        return len(self._alarms)
+    
     def get_alarm_crontabs(self):
         return [cron for cron in self._alarms.keys()]
     
@@ -270,17 +287,67 @@ class WebInterface(resource.Resource):
 
     def render_form(self):
         page = ['<html>',
+                '<head>',
+                '  <script>',
+                'var nextRowId = %s;' % self._alarms.num_alarms(),
+                """
+function appendRow() {
+  var ul = document.getElementById("alarms");
+
+  var li = document.createElement("li");
+  li.id = "row" + nextRowId;
+
+  var input = document.createElement("input");
+  input.type = "text";
+  input.name = "alarm" + nextRowId;
+  input.value = "* * * * *";
+  li.appendChild(input);
+
+  var button = document.createElement("input");
+  button.type = "button";
+  button.value = "Delete";
+  button.setAttribute("onClick", "deleteRow(" + nextRowId + ")");
+  li.appendChild(button);
+
+  ul.appendChild(li);
+  nextRowId = nextRowId + 1;
+}
+
+function deleteRow(rowNum) {
+  var row = document.getElementById("row" + rowNum);
+  row.parentNode.removeChild(row);
+}
+                """,
+                '  </script>',
+                '</head>',
                 '<body>',
                 '  <p>Current alarms:</p>',
                 '  <form method="POST">',
-                '  <ul>']
+                '  <ul id="alarms">']
         i = 0
         for alarm in self._alarms.get_alarm_crontabs():
-            page.append('    <li><input type="text" name="alarm%s" value="%s"></li>' % (i, alarm))
-        page.append('  </ul>')
-        page.append('  <input type="submit" value="Submit">')
-        page.append('  </form>')
-        page.append('</body></html>')
+            page.append('    <li id="row%s"><input type="text" name="alarm%s" value="%s"><input type="button" value="Delete" onClick="deleteRow(%s)"></li>' % (i, i, alarm, i))
+            i += 1
+
+        page.extend([
+            '  </ul>',
+            '  <input type="button" value="Add Alarm" onClick="appendRow()">',
+            '  <input type="submit" value="Submit">',
+            '  </form>'])
+
+        now = datetime.datetime.now()
+        page.append('  <p>Current time: %s</p>' % now.strftime('%I:%M:%S %p %A, %B %d, %Y'))
+        
+        page.extend([
+            '  <p>Next %s alarms:</p>' % NUM_ALARMS_DISPLAY,
+            '  <ul>'])
+
+        for alarm in self._alarms.next_alarms(NUM_ALARMS_DISPLAY, now=now):
+            page.append('    <li>%s</li>' % alarm.strftime('%I:%M:%S %p %A, %B %d, %Y'))
+        page.extend([
+            '  </ul>',
+            '</body></html>',
+            '</body></html>'])
         return ('\n'.join(page)).encode('utf-8')
 
     def render_POST(self, request):
@@ -323,7 +390,7 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-a", "--alarm", dest="alarm", type=str, default="30 8 * * *", help="alarm time in cron format [default: '%(default)s']")
+        parser.add_argument("-a", "--alarm", dest="alarm", type=str, default="30 8 * * MON-FRI", help="alarm time in cron format [default: '%(default)s']")
         parser.add_argument("-m", "--mpd", dest="mpd", action="store_true", default=False, help="enable MPD server [default: %(default)s]")
         parser.add_argument("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %(default)s]")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
