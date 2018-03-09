@@ -92,7 +92,7 @@ class Alarms(object):
         return min([alarm.next(default_utc=False) for alarm in self._alarms.values()])
 
     def get_alarm_crontabs(self):
-        return [self._alarms[cron] for cron in self._alarms.keys()]
+        return [cron for cron in self._alarms.keys()]
     
 
 class SerialProtocol(LineReceiver):
