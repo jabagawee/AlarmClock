@@ -63,7 +63,7 @@ int get_number(int digit);
 void set_number(int digit, int value);
 void cathode_high();
 void add();
-void updateRelay();
+void updateOutputs();
 time_t requestSync();
 
 void setup() {
@@ -194,7 +194,7 @@ void showNewData() {
         }
       }
     }
-    updateRelay();
+    updateOutputs();
 	}
 }
 
@@ -256,18 +256,20 @@ void add()
   if (second() == 0) {
     writeCurrentTime();
   }
-  if (buzzer) {
-    // tone(BUZZER, 523, 1100);
-    tone(BUZZER, 1047, 1100);
-  }
-  updateRelay();
+  updateOutputs();
 }
 
-void updateRelay() {
+void updateOutputs() {
   if (relay) {
     digitalWrite(RELAY, HIGH);
   } else {
     digitalWrite(RELAY, LOW);
+  }
+  if (buzzer) {
+    // tone(BUZZER, 523, 1100);
+    tone(BUZZER, 1047, 1100);
+  } else {
+    noTone(BUZZER);
   }
 }
 
