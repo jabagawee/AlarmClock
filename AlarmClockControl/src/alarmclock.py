@@ -149,6 +149,7 @@ class SerialProtocol(LineReceiver):
                 self.state = SLEEP
                 self.sleep_time = reactor.callLater(3600.0, self.everything_off)
                 self.relay = True
+                self.buzzer = False
                 self.lights = False
                 sys.stdout.write('Turning on sleep\n')
                 self.sendState()
@@ -169,6 +170,7 @@ class SerialProtocol(LineReceiver):
                     self.snooze_time.cancel()
                 self.snooze_time = None
                 self.relay = False
+                self.buzzer = False
                 self.lights = False
                 sys.stdout.write('Turning off alarm\n')
                 self.sendState()
@@ -184,6 +186,7 @@ class SerialProtocol(LineReceiver):
                     self.snooze_time.cancel()
                 self.snooze_time = reactor.callLater(540.0, self.snooze_over)
                 self.relay = False
+                self.buzzer = False
                 self.lights = False
                 sys.stdout.write('Turning on snooze\n')
                 self.sendState()
@@ -201,6 +204,7 @@ class SerialProtocol(LineReceiver):
                     self.sleep_time.cancel()
                 self.sleep_time = None
                 self.relay = False
+                self.buzzer = False
                 self.lights = False
                 sys.stdout.write('Turning off sleep\n')
                 self.sendState()
@@ -217,6 +221,7 @@ class SerialProtocol(LineReceiver):
         self.state = ALARM
         self.alarm_off_time = reactor.callLater(3600.0, self.everything_off)
         self.relay = True
+        self.buzzer = True
         self.lights = True
         sys.stdout.write('Turning on alarm\n')
         self.sendState()
@@ -232,6 +237,7 @@ class SerialProtocol(LineReceiver):
         self.state = ALARM
         self.snooze_time = None
         self.relay = True
+        self.buzzer = True
         self.lights = True
         sys.stdout.write('Resuming alarm after snooze\n')
         self.sendState()
@@ -258,6 +264,7 @@ class SerialProtocol(LineReceiver):
             return
         self.state = OFF
         self.relay = False
+        self.buzzer = False
         self.lights = False
         self.sendState()
         if (self.mpd):
