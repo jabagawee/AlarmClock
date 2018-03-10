@@ -78,19 +78,38 @@ def mpdClose(client):
     client.disconnect()  
 
 
+class Alarm(object):
+    """
+    A single (possibly recurring) alarm.
+    """
+    
+    def __init__(self, crontab):
+        self._crontab = crontab
+        self._alarm = CronTab(crontab)
+    
+    def next(self, now=None):
+        if now is None:
+            return self._alarm.next(default_utc=False)
+        else:
+            return self._alarm.next(now=now, default_utc=False)
+
+    def get_crontab(self):
+        return self._crontab
+
+
 class Alarms(object):
     """
     Container for multiple recurring alarms.
     """
     
     def __init__(self, initial_alarm):
-        self._alarms = {initial_alarm: CronTab(initial_alarm)}
+        self._alarms = [Alarm(initial_alarm)]
     
-    def update(self, alarms):
-        self._alarms = {alarm: CronTab(alarm) for alarm in alarms}
+    def reschedule_all(self, alarms):
+        self._alarms = [Alarm(alarm) for alarm in alarms]
 
     def next_alarm(self):
-        return min([alarm.next(default_utc=False) for alarm in self._alarms.values()])
+        return min([alarm.next() for alarm in self._alarms])
 
     def next_alarms(self, num_alarms, now=None):
         if now is None:
@@ -99,8 +118,8 @@ class Alarms(object):
 
         for _ in range(num_alarms):
             now += datetime.timedelta(seconds=min(
-                alarm.next(now=now, default_utc=False)
-                for alarm in self._alarms.values()))
+                alarm.next(now=now)
+                for alarm in self._alarms))
             result.append(now)
 
         return result
@@ -109,7 +128,7 @@ class Alarms(object):
         return len(self._alarms)
     
     def get_alarm_crontabs(self):
-        return [cron for cron in self._alarms.keys()]
+        return [alarm.get_crontab() for alarm in self._alarms]
     
 
 class SerialProtocol(LineReceiver):
@@ -362,7 +381,7 @@ function deleteRow(rowNum) {
                       for arg in request.args.keys()
                       if arg.startswith('alarm'.encode('utf-8'))]
         sys.stdout.write('New alarms received: ' + '   '.join(new_alarms) + '\n')
-        self._alarms.update(new_alarms)
+        self._alarms.reschedule_all(new_alarms)
         self._serialProtocol.rescheduleAlarm()
         return self.render_form()
 
