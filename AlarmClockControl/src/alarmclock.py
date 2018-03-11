@@ -16,7 +16,7 @@ alarmclock is a script to control an Arduino/Raspberry Pi alarm clock.
 
 import datetime
 import mpd
-import os
+# import os
 import sys
 
 from argparse import ArgumentParser
@@ -185,14 +185,14 @@ class SerialProtocol(LineReceiver):
             self.alarm_time.cancel()
         next_alarm = self.alarms.next_alarm()
         sys.stdout.write('Scheduling next alarm in: ' + str(next_alarm) + ' seconds\n')
-        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds)
+        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds) #@UndefinedVariable
 
     def lineReceived(self, line):
         print("Serial RX: {0}".format(line))
         if line[:1] == SLEEP_BUTTON:
             if self.state == OFF:
                 self.state = SLEEP
-                self.sleep_time = reactor.callLater(3600.0, self.everything_off)
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
                 self.relay = True
                 self.buzzer = False
                 self.lights = False
@@ -205,7 +205,7 @@ class SerialProtocol(LineReceiver):
             elif self.state == SLEEP:
                 if self.sleep_time is not None and self.sleep_time.active():
                     self.sleep_time.cancel()
-                self.sleep_time = reactor.callLater(3600.0, self.everything_off)
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
             elif self.state == ALARM or self.state == SNOOZE:
                 self.state = OFF
                 if self.alarm_off_time is not None and self.alarm_off_time.active():
@@ -229,7 +229,7 @@ class SerialProtocol(LineReceiver):
                 self.state = SNOOZE
                 if self.snooze_time is not None and self.snooze_time.active():
                     self.snooze_time.cancel()
-                self.snooze_time = reactor.callLater(540.0, self.snooze_over)
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over) #@UndefinedVariable
                 self.relay = False
                 self.buzzer = False
                 self.lights = False
@@ -242,7 +242,7 @@ class SerialProtocol(LineReceiver):
             elif self.state == SNOOZE:
                 if self.snooze_time is not None and self.snooze_time.active():
                     self.snooze_time.cancel()
-                self.snooze_time = reactor.callLater(540.0, self.snooze_over)
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over) #@UndefinedVariable
             elif self.state == SLEEP:
                 self.state = OFF
                 if self.sleep_time is not None and self.sleep_time.active():
@@ -264,7 +264,7 @@ class SerialProtocol(LineReceiver):
             sys.stderr.write('Bad state ' + str(self.state) + ', expected ' + str(OFF))
             return
         self.state = ALARM
-        self.alarm_off_time = reactor.callLater(3600.0, self.everything_off)
+        self.alarm_off_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
         self.relay = True
         self.buzzer = True
         self.lights = True
@@ -419,7 +419,7 @@ def main(argv=None): # IGNORE:C0111
     else:
         sys.argv.extend(argv)
 
-    program_name = os.path.basename(sys.argv[0])
+    # program_name = os.path.basename(sys.argv[0])
     program_version = "v%s" % __version__
     program_build_date = str(__updated__)
     program_version_message = '%%(prog)s %s (%s)' % (program_version, program_build_date)
@@ -457,7 +457,7 @@ USAGE
         #if verbose > 0:
         #    print("Verbose mode on")
 
-        print("Using Twisted reactor {0}".format(reactor.__class__))
+        print("Using Twisted reactor {0}".format(reactor.__class__)) #@UndefinedVariable
         
         alarms = Alarms(args.save)
     
@@ -465,11 +465,11 @@ USAGE
     
         # Create embedded web server to manage the alarms.
         if args.web:
-            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol)))
+            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol))) #@UndefinedVariable
 
         print('About to open serial port {0} [{1} baud] ..'.format(args.port, 9600))
         try:
-            serialPort = SerialPort(serialProtocol, args.port, reactor, baudrate=9600)
+            SerialPort(serialProtocol, args.port, reactor, baudrate=9600)
         except Exception as e:
             print('Could not open serial port: {0}'.format(e))
             return 1
@@ -496,7 +496,7 @@ USAGE
         loopDeferred.addErrback(ebLoopFailed)
     
         # start the component and the Twisted reactor ..
-        reactor.run()
+        reactor.run() #@UndefinedVariable
         
         return 0
     except KeyboardInterrupt:
