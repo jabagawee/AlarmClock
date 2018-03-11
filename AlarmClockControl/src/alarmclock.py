@@ -335,9 +335,12 @@ class WebInterface(resource.Resource):
         self._serialProtocol = serialProtocol
 
     def render_GET(self, request):
-        return self.render_form()
+        return self._render_form(
+            int(request.args['showalarms'.encode('utf-8')][0].decode('utf-8'))
+            if 'showalarms'.encode('utf-8') in request.args.keys()
+            else NUM_ALARMS_DISPLAY)
 
-    def render_form(self):
+    def _render_form(self, num_alarms_display):
         page = ['<html>',
                 '<head>',
                 '  <script>',
@@ -391,13 +394,15 @@ function deleteRow(rowNum) {
         page.append('  <p>Current time: %s</p>' % now.strftime('%I:%M:%S %p %A, %B %d, %Y'))
         
         page.extend([
-            '  <p>Next %s alarms:</p>' % NUM_ALARMS_DISPLAY,
+            '  <p>Next %s alarms:</p>' % num_alarms_display,
             '  <ul>'])
 
-        for alarm in self._alarms.next_alarms(NUM_ALARMS_DISPLAY, now=now):
+        for alarm in self._alarms.next_alarms(num_alarms_display, now=now):
             page.append('    <li>%s</li>' % alarm.strftime('%I:%M:%S %p %A, %B %d, %Y'))
         page.extend([
             '  </ul>',
+            '<p><a href="?showalarms=%s">Show %s more alarms</a></p>' %
+            (num_alarms_display + NUM_ALARMS_DISPLAY, NUM_ALARMS_DISPLAY,),
             '</body></html>',
             '</body></html>'])
         return ('\n'.join(page)).encode('utf-8')
@@ -408,7 +413,7 @@ function deleteRow(rowNum) {
                       if arg.startswith('alarm'.encode('utf-8'))]
         self._alarms.reschedule_all(new_alarms)
         self._serialProtocol.rescheduleAlarm()
-        return self.render_form()
+        return self._render_form()
 
 
 def main(argv=None): # IGNORE:C0111
