@@ -102,11 +102,37 @@ class Alarms(object):
     Container for multiple recurring alarms.
     """
     
-    def __init__(self, initial_alarm):
-        self._alarms = [Alarm(initial_alarm)]
+    def __init__(self, save_path):
+        self._save_path = None
+        self._alarms = []
+        if save_path != '':
+            self._save_path = save_path
+            try:
+                with open(self._save_path) as f:
+                    self._alarms = [Alarm(line.strip())
+                                    for line in f.readlines()
+                                    if not line.startswith('#')]
+            except:
+                sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
+            else:
+                sys.stdout.write('Loaded %s alarms from save file %s:\n  %s\n' %
+                                 (len(self._alarms), self._save_path,
+                                  '\n  '.join(alarm.get_crontab() for alarm in self._alarms)))
     
     def reschedule_all(self, alarms):
-        self._alarms = [Alarm(alarm) for alarm in alarms]
+        sys.stdout.write('Rescheduling new alarms:\n  %s\n' %
+                         ('\n  '.join(alarm.strip() for alarm in alarms),))
+        self._alarms = [Alarm(alarm.strip()) for alarm in alarms]
+        if self._save_path:
+            try:
+                with open(self._save_path, 'w') as f:
+                    f.write('# m h dom mon dow\n')
+                    for alarm in self._alarms:
+                        f.write(alarm.get_crontab() + '\n')
+                sys.stdout.write('Wrote %s alarms to save file %s\n' %
+                                 (len(self._alarms), self._save_path))
+            except:
+                sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
 
     def next_alarm(self):
         return min([alarm.next() for alarm in self._alarms])
@@ -380,7 +406,6 @@ function deleteRow(rowNum) {
         new_alarms = [request.args[arg][0].decode('utf-8')
                       for arg in request.args.keys()
                       if arg.startswith('alarm'.encode('utf-8'))]
-        sys.stdout.write('New alarms received: ' + '   '.join(new_alarms) + '\n')
         self._alarms.reschedule_all(new_alarms)
         self._serialProtocol.rescheduleAlarm()
         return self.render_form()
@@ -416,7 +441,7 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-a", "--alarm", dest="alarm", type=str, default="30 8 * * MON-FRI", help="alarm time in cron format [default: '%(default)s']")
+        parser.add_argument("-s", "--save", dest="save", type=str, default="alarmclock.crontab", help="if set, file to save alarms to [default: %(default)s]")
         parser.add_argument("-m", "--mpd", dest="mpd", action="store_true", default=False, help="enable MPD server [default: %(default)s]")
         parser.add_argument("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %(default)s]")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
@@ -434,7 +459,7 @@ USAGE
 
         print("Using Twisted reactor {0}".format(reactor.__class__))
         
-        alarms = Alarms(args.alarm)
+        alarms = Alarms(args.save)
     
         serialProtocol = SerialProtocol(args.mpd, alarms)
     
