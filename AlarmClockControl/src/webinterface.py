@@ -25,7 +25,7 @@ class WebInterface(resource.Resource):
         page = ['<html>',
                 '<head>',
                 '  <script>',
-                'var nextRowId = %s;' % self._alarms.num_alarms(),
+                'var nextRowId = %s;' % len(self._alarms),
                 '''\
                 function appendRow() {
                 var ul = document.getElementById("alarms");

@@ -71,7 +71,7 @@ class Alarms(object):
 
         return result
 
-    def num_alarms(self):
+    def __len__(self):
         return len(self._alarms)
 
     def get_alarm_crontabs(self):
