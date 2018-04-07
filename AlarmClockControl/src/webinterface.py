@@ -84,7 +84,6 @@ class WebInterface(resource.Resource):
             '  </ul>',
             '<p><a href="?showalarms=%d">Show %d more alarms</a></p>' %
             (num_alarms_display + NUM_ALARMS_DISPLAY, NUM_ALARMS_DISPLAY),
-            '</body></html>',
             '</body></html>'])
         return ('\n'.join(page)).encode('utf-8')
 
