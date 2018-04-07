@@ -29,7 +29,7 @@ class Alarms(object):
         if save_path != '':
             self._save_path = save_path
             self._alarms = self._load_alarms()
-            sys.stdout.write('Loaded %s alarms from save file %s:\n' %
+            sys.stdout.write('Loaded %d alarms from save file %s:\n' %
                              (len(self._alarms), self._save_path))
             for alarm in self._alarms:
                 sys.stdout.write('  %s\n' % alarm.get_crontab())
@@ -78,7 +78,7 @@ class Alarms(object):
                 f.write('# m h dom mon dow\n')
                 for crontab in self.get_crontabs():
                     f.write(crontab + '\n')
-            sys.stdout.write('Wrote %s alarms to save file %s\n' %
+            sys.stdout.write('Wrote %d alarms to save file %s\n' %
                              (len(self._alarms), self._save_path))
         except Exception:
             sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
