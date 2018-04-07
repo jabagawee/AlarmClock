@@ -79,9 +79,7 @@ def mpdClose(client):
 
 
 class Alarm(object):
-    '''
-    A single (possibly recurring) alarm.
-    '''
+    '''A single (possibly recurring) alarm.'''
     
     def __init__(self, crontab):
         self._crontab = crontab
@@ -98,9 +96,7 @@ class Alarm(object):
 
 
 class Alarms(object):
-    '''
-    Container for multiple recurring alarms.
-    '''
+    '''Container for multiple recurring alarms.'''
     
     def __init__(self, save_path):
         self._save_path = None
@@ -158,9 +154,7 @@ class Alarms(object):
     
 
 class SerialProtocol(LineReceiver):
-    '''
-    Arduino serial communication protocol.
-    '''
+    '''Arduino serial communication protocol.'''
     
     def __init__(self, mpd, alarms):
         super(SerialProtocol, self).__init__()
@@ -475,15 +469,11 @@ def main(argv=None): # IGNORE:C0111
         loop = task.LoopingCall(serialProtocol.sendState)
 
         def cbLoopDone(result):
-            '''
-            Called when loop was stopped with success.
-            '''
+            '''Called when loop was stopped with success.'''
             print('Loop done: ' + result)
         
         def ebLoopFailed(failure):
-            '''
-            Called when loop execution failed.
-            '''
+            '''Called when loop execution failed.'''
             print(failure.getBriefTraceback())
             
         # Start looping every 10 seconds.
