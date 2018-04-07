@@ -18,6 +18,7 @@ import datetime
 import mpd
 # import os
 import sys
+import textwrap
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
@@ -345,33 +346,33 @@ class WebInterface(resource.Resource):
                 '<head>',
                 '  <script>',
                 'var nextRowId = %s;' % self._alarms.num_alarms(),
-                """
-function appendRow() {
-  var ul = document.getElementById("alarms");
+                """\
+                function appendRow() {
+                var ul = document.getElementById("alarms");
 
-  var li = document.createElement("li");
-  li.id = "row" + nextRowId;
+                var li = document.createElement("li");
+                li.id = "row" + nextRowId;
 
-  var input = document.createElement("input");
-  input.type = "text";
-  input.name = "alarm" + nextRowId;
-  input.value = "* * * * *";
-  li.appendChild(input);
+                var input = document.createElement("input");
+                input.type = "text";
+                input.name = "alarm" + nextRowId;
+                input.value = "* * * * *";
+                li.appendChild(input);
 
-  var button = document.createElement("input");
-  button.type = "button";
-  button.value = "Delete";
-  button.setAttribute("onClick", "deleteRow(" + nextRowId + ")");
-  li.appendChild(button);
+                var button = document.createElement("input");
+                button.type = "button";
+                button.value = "Delete";
+                button.setAttribute("onClick", "deleteRow(" + nextRowId + ")");
+                li.appendChild(button);
 
-  ul.appendChild(li);
-  nextRowId = nextRowId + 1;
-}
+                ul.appendChild(li);
+                nextRowId = nextRowId + 1;
+                }
 
-function deleteRow(rowNum) {
-  var row = document.getElementById("row" + rowNum);
-  row.parentNode.removeChild(row);
-}
+                function deleteRow(rowNum) {
+                var row = document.getElementById("row" + rowNum);
+                row.parentNode.removeChild(row);
+                }
                 """,
                 '  </script>',
                 '</head>',
@@ -429,19 +430,20 @@ def main(argv=None): # IGNORE:C0111
     program_build_date = str(__updated__)
     program_version_message = '%%(prog)s %s (%s)' % (program_version, program_build_date)
     program_shortdesc = __import__('__main__').__doc__.split("\n")[1]
-    program_license = '''%s
+    program_license = textwrap.dedent('''\
+    %s
 
-  Created by camrdale on %s.
-  Copyright 2018 camrdale. All rights reserved.
+      Created by camrdale on %s.
+      Copyright 2018 camrdale. All rights reserved.
 
-  Licensed under the Apache License 2.0
-  http://www.apache.org/licenses/LICENSE-2.0
+      Licensed under the Apache License 2.0
+      http://www.apache.org/licenses/LICENSE-2.0
 
-  Distributed on an "AS IS" basis without warranties
-  or conditions of any kind, either express or implied.
+      Distributed on an "AS IS" basis without warranties
+      or conditions of any kind, either express or implied.
 
-USAGE
-''' % (program_shortdesc, str(__date__))
+    USAGE
+    ''' % (program_shortdesc, str(__date__)))
 
     try:
         # Setup argument parser
