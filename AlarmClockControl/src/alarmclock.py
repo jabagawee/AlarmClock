@@ -59,6 +59,13 @@ class MPDClientWrapper(object):
         self.host = host
         self.port = port
 
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def connect(self):
         self.client = mpd.MPDClient()
         self.client.timeout = self.timeout
@@ -123,10 +130,8 @@ class SerialProtocol(LineReceiver):
                 sys.stdout.write('Turning on sleep\n')
                 self.sendState()
                 if (self.mpd):
-                    client = MPDClientWrapper()
-                    client.connect()
-                    client.playKqed()
-                    client.close()
+                    with MPDClientWrapper() as client:
+                        client.playKqed()
             elif self.state == SLEEP:
                 if self.sleep_time is not None and self.sleep_time.active():
                     self.sleep_time.cancel()
@@ -145,10 +150,8 @@ class SerialProtocol(LineReceiver):
                 sys.stdout.write('Turning off alarm\n')
                 self.sendState()
                 if (self.mpd):
-                    client = MPDClientWrapper()
-                    client.connect()
-                    client.stopPlaying()
-                    client.close()
+                    with MPDClientWrapper() as client:
+                        client.stopPlaying()
 
         if line[:1] == SNOOZE_BUTTON:
             if self.state == ALARM:
@@ -162,10 +165,8 @@ class SerialProtocol(LineReceiver):
                 sys.stdout.write('Turning on snooze\n')
                 self.sendState()
                 if (self.mpd):
-                    client = MPDClientWrapper()
-                    client.connect()
-                    client.stopPlaying()
-                    client.close()
+                    with MPDClientWrapper() as client:
+                        client.stopPlaying()
             elif self.state == SNOOZE:
                 if self.snooze_time is not None and self.snooze_time.active():
                     self.snooze_time.cancel()
@@ -181,10 +182,8 @@ class SerialProtocol(LineReceiver):
                 sys.stdout.write('Turning off sleep\n')
                 self.sendState()
                 if (self.mpd):
-                    client = MPDClientWrapper()
-                    client.connect()
-                    client.stopPlaying()
-                    client.close()
+                    with MPDClientWrapper() as client:
+                        client.stopPlaying()
 
     def alarm_sounds(self):
         self.rescheduleAlarm()
@@ -199,10 +198,8 @@ class SerialProtocol(LineReceiver):
         sys.stdout.write('Turning on alarm\n')
         self.sendState()
         if (self.mpd):
-            client = MPDClientWrapper()
-            client.connect()
-            client.playKqed()
-            client.close()
+            with MPDClientWrapper() as client:
+                client.playKqed()
 
     def snooze_over(self):
         if self.state != SNOOZE:
@@ -216,10 +213,8 @@ class SerialProtocol(LineReceiver):
         sys.stdout.write('Resuming alarm after snooze\n')
         self.sendState()
         if (self.mpd):
-            client = MPDClientWrapper()
-            client.connect()
-            client.playKqed()
-            client.close()
+            with MPDClientWrapper() as client:
+                client.playKqed()
 
     def everything_off(self):
         if self.state == SLEEP:
@@ -243,10 +238,8 @@ class SerialProtocol(LineReceiver):
         self.lights = False
         self.sendState()
         if (self.mpd):
-            client = MPDClientWrapper()
-            client.connect()
-            client.stopPlaying()
-            client.close()
+            with MPDClientWrapper() as client:
+                client.stopPlaying()
 
     def sendState(self):
         '''
