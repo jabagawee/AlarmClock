@@ -75,14 +75,14 @@ class WebInterface(resource.Resource):
         page.append('  <p>Current time: %s</p>' % now.strftime('%I:%M:%S %p %A, %B %d, %Y'))
 
         page.extend([
-            '  <p>Next %s alarms:</p>' % num_alarms_display,
+            '  <p>Next %d alarms:</p>' % num_alarms_display,
             '  <ul>'])
 
         for alarm in self._alarms.next_alarms(num_alarms_display, now=now):
             page.append('    <li>%s</li>' % alarm.strftime('%I:%M:%S %p %A, %B %d, %Y'))
         page.extend([
             '  </ul>',
-            '<p><a href="?showalarms=%s">Show %s more alarms</a></p>' %
+            '<p><a href="?showalarms=%d">Show %d more alarms</a></p>' %
             (num_alarms_display + NUM_ALARMS_DISPLAY, NUM_ALARMS_DISPLAY),
             '</body></html>',
             '</body></html>'])
