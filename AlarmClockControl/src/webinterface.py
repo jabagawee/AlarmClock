@@ -93,4 +93,4 @@ class WebInterface(resource.Resource):
                       if arg.startswith('alarm'.encode('utf-8'))]
         self._alarms.reschedule_all(new_alarms)
         self._serialProtocol.rescheduleAlarm()
-        return self._render_form()
+        return self._render_form(NUM_ALARMS_DISPLAY)
