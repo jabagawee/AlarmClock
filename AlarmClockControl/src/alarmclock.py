@@ -111,7 +111,7 @@ class Alarms(object):
                     self._alarms = [Alarm(line.strip())
                                     for line in f.readlines()
                                     if not line.startswith('#')]
-            except:
+            except Exception:
                 sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
             else:
                 sys.stdout.write('Loaded %s alarms from save file %s:\n  %s\n' %
@@ -130,7 +130,7 @@ class Alarms(object):
                         f.write(alarm.get_crontab() + '\n')
                 sys.stdout.write('Wrote %s alarms to save file %s\n' %
                                  (len(self._alarms), self._save_path))
-            except:
+            except Exception:
                 sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
 
     def next_alarm(self):
