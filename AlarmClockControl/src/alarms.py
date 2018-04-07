@@ -5,6 +5,7 @@ import sys
 
 from crontab import CronTab
 
+
 class Alarm(object):
     '''A single (possibly recurring) alarm.'''
 
