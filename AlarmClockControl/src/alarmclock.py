@@ -62,29 +62,32 @@ def mpdConnect():
     print(client.status())
     return client
 
+
 def playKqed(client):
     client.clear()
     client.add(KQED)
     client.play()
     print(client.status())
     print(client.playlist())
-    
+
+
 def stopPlaying(client):
     client.stop()
     print(client.status())
 
+
 def mpdClose(client):
     client.close()
-    client.disconnect()  
+    client.disconnect()
 
 
 class Alarm(object):
     '''A single (possibly recurring) alarm.'''
-    
+
     def __init__(self, crontab):
         self._crontab = crontab
         self._alarm = CronTab(crontab)
-    
+
     def next(self, now=None):
         if now is None:
             return self._alarm.next(default_utc=False)
@@ -97,7 +100,7 @@ class Alarm(object):
 
 class Alarms(object):
     '''Container for multiple recurring alarms.'''
-    
+
     def __init__(self, save_path):
         self._save_path = None
         self._alarms = []
@@ -114,7 +117,7 @@ class Alarms(object):
                 sys.stdout.write('Loaded %s alarms from save file %s:\n  %s\n' %
                                  (len(self._alarms), self._save_path,
                                   '\n  '.join(alarm.get_crontab() for alarm in self._alarms)))
-    
+
     def reschedule_all(self, alarms):
         sys.stdout.write('Rescheduling new alarms:\n  %s\n' %
                          ('\n  '.join(alarm.strip() for alarm in alarms),))
@@ -148,14 +151,14 @@ class Alarms(object):
 
     def num_alarms(self):
         return len(self._alarms)
-    
+
     def get_alarm_crontabs(self):
         return [alarm.get_crontab() for alarm in self._alarms]
-    
+
 
 class SerialProtocol(LineReceiver):
     '''Arduino serial communication protocol.'''
-    
+
     def __init__(self, mpd, alarms):
         super(SerialProtocol, self).__init__()
         self.mpd = mpd
@@ -168,25 +171,25 @@ class SerialProtocol(LineReceiver):
         self.snooze_time = None
         self.alarm_off_time = None
         self.alarm_time = None
-        
+
     def connectionMade(self):
         print('Serial port connected.')
         self.rescheduleAlarm()
         self.sendState()
-        
+
     def rescheduleAlarm(self):
         if self.alarm_time is not None and self.alarm_time.active():
             self.alarm_time.cancel()
         next_alarm = self.alarms.next_alarm()
         sys.stdout.write('Scheduling next alarm in: ' + str(next_alarm) + ' seconds\n')
-        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds) #@UndefinedVariable
+        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds)  # @UndefinedVariable
 
     def lineReceived(self, line):
         print('Serial RX: {0}'.format(line))
         if line[:1] == SLEEP_BUTTON:
             if self.state == OFF:
                 self.state = SLEEP
-                self.sleep_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off)  # @UndefinedVariable
                 self.relay = True
                 self.buzzer = False
                 self.lights = False
@@ -199,7 +202,7 @@ class SerialProtocol(LineReceiver):
             elif self.state == SLEEP:
                 if self.sleep_time is not None and self.sleep_time.active():
                     self.sleep_time.cancel()
-                self.sleep_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off)  # @UndefinedVariable
             elif self.state == ALARM or self.state == SNOOZE:
                 self.state = OFF
                 if self.alarm_off_time is not None and self.alarm_off_time.active():
@@ -217,13 +220,13 @@ class SerialProtocol(LineReceiver):
                     client = mpdConnect()
                     stopPlaying(client)
                     mpdClose(client)
-                
+
         if line[:1] == SNOOZE_BUTTON:
             if self.state == ALARM:
                 self.state = SNOOZE
                 if self.snooze_time is not None and self.snooze_time.active():
                     self.snooze_time.cancel()
-                self.snooze_time = reactor.callLater(540.0, self.snooze_over) #@UndefinedVariable
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over)  # @UndefinedVariable
                 self.relay = False
                 self.buzzer = False
                 self.lights = False
@@ -236,7 +239,7 @@ class SerialProtocol(LineReceiver):
             elif self.state == SNOOZE:
                 if self.snooze_time is not None and self.snooze_time.active():
                     self.snooze_time.cancel()
-                self.snooze_time = reactor.callLater(540.0, self.snooze_over) #@UndefinedVariable
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over)  # @UndefinedVariable
             elif self.state == SLEEP:
                 self.state = OFF
                 if self.sleep_time is not None and self.sleep_time.active():
@@ -258,7 +261,7 @@ class SerialProtocol(LineReceiver):
             sys.stderr.write('Bad state ' + str(self.state) + ', expected ' + str(OFF))
             return
         self.state = ALARM
-        self.alarm_off_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
+        self.alarm_off_time = reactor.callLater(3600.0, self.everything_off)  # @UndefinedVariable
         self.relay = True
         self.buzzer = True
         self.lights = True
@@ -322,7 +325,7 @@ class SerialProtocol(LineReceiver):
 
 class WebInterface(resource.Resource):
     isLeaf = True
-    
+
     def __init__(self, alarms, serialProtocol):
         super(WebInterface, self).__init__()
         self._alarms = alarms
@@ -386,7 +389,7 @@ class WebInterface(resource.Resource):
 
         now = datetime.datetime.now()
         page.append('  <p>Current time: %s</p>' % now.strftime('%I:%M:%S %p %A, %B %d, %Y'))
-        
+
         page.extend([
             '  <p>Next %s alarms:</p>' % num_alarms_display,
             '  <ul>'])
@@ -410,7 +413,7 @@ class WebInterface(resource.Resource):
         return self._render_form()
 
 
-def main(argv=None): # IGNORE:C0111
+def main(argv=None):  # IGNORE:C0111
     '''Command line options.'''
 
     if argv is None:
@@ -449,15 +452,15 @@ def main(argv=None): # IGNORE:C0111
 
         args = parser.parse_args()
 
-        print('Using Twisted reactor {0}'.format(reactor.__class__)) #@UndefinedVariable
-        
+        print('Using Twisted reactor {0}'.format(reactor.__class__))  # @UndefinedVariable
+
         alarms = Alarms(args.save)
-    
+
         serialProtocol = SerialProtocol(args.mpd, alarms)
-    
+
         # Create embedded web server to manage the alarms.
         if args.web:
-            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol))) #@UndefinedVariable
+            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol)))  # @UndefinedVariable
 
         print('About to open serial port {0} [{1} baud] ..'.format(args.port, 9600))
         try:
@@ -471,24 +474,25 @@ def main(argv=None): # IGNORE:C0111
         def cbLoopDone(result):
             '''Called when loop was stopped with success.'''
             print('Loop done: ' + result)
-        
+
         def ebLoopFailed(failure):
             '''Called when loop execution failed.'''
             print(failure.getBriefTraceback())
-            
+
         # Start looping every 10 seconds.
         loopDeferred = loop.start(10.0)
-        
+
         # Add callbacks for stop and failure.
         loopDeferred.addCallback(cbLoopDone)
         loopDeferred.addErrback(ebLoopFailed)
-    
+
         # start the component and the Twisted reactor ..
-        reactor.run() #@UndefinedVariable
-        
+        reactor.run()  # @UndefinedVariable
+
         return 0
     except KeyboardInterrupt:
         return 0
+
 
 if __name__ == '__main__':
     if DEBUG:
