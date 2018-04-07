@@ -14,10 +14,7 @@ class Alarm(object):
         self._alarm = CronTab(crontab)
 
     def next(self, now=None):
-        if now is None:
-            return self._alarm.next(default_utc=False)
-        else:
-            return self._alarm.next(now=now, default_utc=False)
+        return self._alarm.next(now=now, default_utc=False)
 
     def get_crontab(self):
         return self._crontab
