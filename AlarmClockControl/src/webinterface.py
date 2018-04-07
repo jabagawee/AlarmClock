@@ -83,7 +83,7 @@ class WebInterface(resource.Resource):
         page.extend([
             '  </ul>',
             '<p><a href="?showalarms=%s">Show %s more alarms</a></p>' %
-            (num_alarms_display + NUM_ALARMS_DISPLAY, NUM_ALARMS_DISPLAY,),
+            (num_alarms_display + NUM_ALARMS_DISPLAY, NUM_ALARMS_DISPLAY),
             '</body></html>',
             '</body></html>'])
         return ('\n'.join(page)).encode('utf-8')
