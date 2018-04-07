@@ -28,18 +28,11 @@ class Alarms(object):
         self._alarms = []
         if save_path != '':
             self._save_path = save_path
-            try:
-                with open(self._save_path) as f:
-                    self._alarms = [_Alarm(line.strip())
-                                    for line in f.readlines()
-                                    if not line.startswith('#')]
-            except Exception:
-                sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
-            else:
-                sys.stdout.write('Loaded %s alarms from save file %s:\n' %
-                                 (len(self._alarms), self._save_path))
-                for alarm in self._alarms:
-                    sys.stdout.write('  %s\n' % alarm.get_crontab())
+            self._alarms = self._load_alarms()
+            sys.stdout.write('Loaded %s alarms from save file %s:\n' %
+                             (len(self._alarms), self._save_path))
+            for alarm in self._alarms:
+                sys.stdout.write('  %s\n' % alarm.get_crontab())
 
     def reschedule_all(self, crontabs):
         crontabs = [crontab.strip() for crontab in crontabs]
@@ -50,15 +43,7 @@ class Alarms(object):
 
         self._alarms = [_Alarm(crontab) for crontab in crontabs]
         if self._save_path:
-            try:
-                with open(self._save_path, 'w') as f:
-                    f.write('# m h dom mon dow\n')
-                    for alarm in self._alarms:
-                        f.write(alarm.get_crontab() + '\n')
-                sys.stdout.write('Wrote %s alarms to save file %s\n' %
-                                 (len(self._alarms), self._save_path))
-            except Exception:
-                sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
+            self._save_alarms()
 
     def next_alarm(self):
         return min([alarm.next() for alarm in self._alarms])
@@ -81,3 +66,22 @@ class Alarms(object):
 
     def get_crontabs(self):
         return [alarm.get_crontab() for alarm in self._alarms]
+
+    def _load_alarms(self):
+        assert self._save_path, 'self._save_path should be set'
+        try:
+            with open(self._save_path) as f:
+                return [_Alarm(line.strip()) for line in f.readlines() if not line.startswith('#')]
+        except Exception:
+            sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
+
+    def _save_alarms(self):
+        try:
+            with open(self._save_path, 'w') as f:
+                f.write('# m h dom mon dow\n')
+                for crontab in self.get_crontabs():
+                    f.write(crontab + '\n')
+            sys.stdout.write('Wrote %s alarms to save file %s\n' %
+                             (len(self._alarms), self._save_path))
+        except Exception:
+            sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
