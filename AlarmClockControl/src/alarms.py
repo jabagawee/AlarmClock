@@ -46,20 +46,17 @@ class Alarms(object):
             self._save_alarms()
 
     def next_alarm(self):
-        return min([alarm.next() for alarm in self._alarms])
+        return min(alarm.next() for alarm in self._alarms)
 
     def next_alarms(self, n, now=None):
         if now is None:
             now = datetime.datetime.now()
-        result = []
 
         for _ in range(n):
             now += datetime.timedelta(seconds=min(
                 alarm.next(now=now)
                 for alarm in self._alarms))
-            result.append(now)
-
-        return result
+            yield now
 
     def __len__(self):
         return len(self._alarms)
