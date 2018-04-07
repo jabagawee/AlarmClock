@@ -40,10 +40,10 @@ class Alarms(object):
                                  (len(self._alarms), self._save_path,
                                   '\n  '.join(alarm.get_crontab() for alarm in self._alarms)))
 
-    def reschedule_all(self, alarms):
-        alarms = [alarm.strip() for alarm in alarms]
-        sys.stdout.write('Rescheduling new alarms:\n  %s\n' % ('\n  '.join(alarms),))
-        self._alarms = [Alarm(alarm) for alarm in alarms]
+    def reschedule_all(self, crontabs):
+        crontabs = [crontab.strip() for crontab in crontabs]
+        sys.stdout.write('Rescheduling new alarms:\n  %s\n' % ('\n  '.join(crontabs),))
+        self._alarms = [Alarm(crontab) for crontab in crontabs]
         if self._save_path:
             try:
                 with open(self._save_path, 'w') as f:
