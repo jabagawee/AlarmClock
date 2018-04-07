@@ -53,3 +53,5 @@ local.properties
 
 # Arduino Eclipse plugin build files
 */Release/
+# PyCharm specific files
+.idea
