@@ -61,7 +61,7 @@ class WebInterface(resource.Resource):
                 '  <form method="POST">',
                 '  <ul id="alarms">']
         i = 0
-        for alarm in self._alarms.get_alarm_crontabs():
+        for alarm in self._alarms.get_crontabs():
             page.append('    <li id="row%s"><input type="text" name="alarm%s" value="%s"><input type="button" value="Delete" onClick="deleteRow(%s)"></li>' % (i, i, alarm, i))
             i += 1
 
