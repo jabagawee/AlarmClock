@@ -16,7 +16,6 @@ alarmclock is a script to control an Arduino/Raspberry Pi alarm clock.
 
 import datetime
 import mpd
-# import os
 import sys
 import textwrap
 
@@ -425,7 +424,6 @@ def main(argv=None): # IGNORE:C0111
     else:
         sys.argv.extend(argv)
 
-    # program_name = os.path.basename(sys.argv[0])
     program_version = "v%s" % __version__
     program_build_date = str(__updated__)
     program_version_message = '%%(prog)s %s (%s)' % (program_version, program_build_date)
@@ -446,7 +444,6 @@ def main(argv=None): # IGNORE:C0111
     ''' % (program_shortdesc, str(__date__)))
 
     try:
-        # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
         parser.add_argument("-s", "--save", dest="save", type=str, default="alarmclock.crontab", help="if set, file to save alarms to [default: %(default)s]")
         parser.add_argument("-m", "--mpd", dest="mpd", action="store_true", default=False, help="enable MPD server [default: %(default)s]")
@@ -456,13 +453,7 @@ def main(argv=None): # IGNORE:C0111
                             help='Web port to use for embedded Web server. Use 0 to disable.')
         parser.add_argument(dest="port", help="serial port to connect to [default: %(default)s]", nargs='?', default="COM3")
 
-        # Process arguments
         args = parser.parse_args()
-
-        #verbose = args.verbose
-
-        #if verbose > 0:
-        #    print("Verbose mode on")
 
         print("Using Twisted reactor {0}".format(reactor.__class__)) #@UndefinedVariable
         
@@ -507,15 +498,7 @@ def main(argv=None): # IGNORE:C0111
         
         return 0
     except KeyboardInterrupt:
-        ### handle keyboard interrupt ###
         return 0
-#     except Exception as e:
-#         if DEBUG or TESTRUN:
-#             raise(e)
-#         indent = len(program_name) * " "
-#         sys.stderr.write(program_name + ": " + repr(e) + "\n")
-#         sys.stderr.write(indent + "  for help use --help")
-#         return 2
 
 if __name__ == "__main__":
     if DEBUG:
