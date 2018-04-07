@@ -57,7 +57,7 @@ def mpdConnect():
     client = mpd.MPDClient()
     client.timeout = 10
     client.idletimeout = None
-    client.connect("localhost", 6600)
+    client.connect('localhost', 6600)
     print(client.mpd_version)
     print(client.status())
     return client
@@ -79,9 +79,9 @@ def mpdClose(client):
 
 
 class Alarm(object):
-    """
+    '''
     A single (possibly recurring) alarm.
-    """
+    '''
     
     def __init__(self, crontab):
         self._crontab = crontab
@@ -98,9 +98,9 @@ class Alarm(object):
 
 
 class Alarms(object):
-    """
+    '''
     Container for multiple recurring alarms.
-    """
+    '''
     
     def __init__(self, save_path):
         self._save_path = None
@@ -158,9 +158,9 @@ class Alarms(object):
     
 
 class SerialProtocol(LineReceiver):
-    """
+    '''
     Arduino serial communication protocol.
-    """
+    '''
     
     def __init__(self, mpd, alarms):
         super(SerialProtocol, self).__init__()
@@ -188,7 +188,7 @@ class SerialProtocol(LineReceiver):
         self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds) #@UndefinedVariable
 
     def lineReceived(self, line):
-        print("Serial RX: {0}".format(line))
+        print('Serial RX: {0}'.format(line))
         if line[:1] == SLEEP_BUTTON:
             if self.state == OFF:
                 self.state = SLEEP
@@ -318,9 +318,9 @@ class SerialProtocol(LineReceiver):
             mpdClose(client)
 
     def sendState(self):
-        """
+        '''
         This method is exported as RPC and can be called by connected clients
-        """
+        '''
         new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(self.relay)) + str(int(self.buzzer)) + str(int(self.lights)) + '\n'
         sys.stdout.write('Sending time: ' + new_time)
         self.transport.write(new_time.encode('utf-8'))
@@ -345,7 +345,7 @@ class WebInterface(resource.Resource):
                 '<head>',
                 '  <script>',
                 'var nextRowId = %s;' % self._alarms.num_alarms(),
-                """\
+                '''\
                 function appendRow() {
                 var ul = document.getElementById("alarms");
 
@@ -372,7 +372,7 @@ class WebInterface(resource.Resource):
                 var row = document.getElementById("row" + rowNum);
                 row.parentNode.removeChild(row);
                 }
-                """,
+                ''',
                 '  </script>',
                 '</head>',
                 '<body>',
@@ -424,10 +424,10 @@ def main(argv=None): # IGNORE:C0111
     else:
         sys.argv.extend(argv)
 
-    program_version = "v%s" % __version__
+    program_version = 'v%s' % __version__
     program_build_date = str(__updated__)
     program_version_message = '%%(prog)s %s (%s)' % (program_version, program_build_date)
-    program_shortdesc = __import__('__main__').__doc__.split("\n")[1]
+    program_shortdesc = __import__('__main__').__doc__.split('\n')[1]
     program_license = textwrap.dedent('''\
     %s
 
@@ -445,17 +445,17 @@ def main(argv=None): # IGNORE:C0111
 
     try:
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-s", "--save", dest="save", type=str, default="alarmclock.crontab", help="if set, file to save alarms to [default: %(default)s]")
-        parser.add_argument("-m", "--mpd", dest="mpd", action="store_true", default=False, help="enable MPD server [default: %(default)s]")
-        parser.add_argument("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %(default)s]")
+        parser.add_argument('-s', '--save', dest='save', type=str, default='alarmclock.crontab', help='if set, file to save alarms to [default: %(default)s]')
+        parser.add_argument('-m', '--mpd', dest='mpd', action='store_true', default=False, help='enable MPD server [default: %(default)s]')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='count', help='set verbosity level [default: %(default)s]')
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
-        parser.add_argument("--web", type=int, default=8000,
+        parser.add_argument('--web', type=int, default=8000,
                             help='Web port to use for embedded Web server. Use 0 to disable.')
-        parser.add_argument(dest="port", help="serial port to connect to [default: %(default)s]", nargs='?', default="COM3")
+        parser.add_argument(dest='port', help='serial port to connect to [default: %(default)s]', nargs='?', default='COM3')
 
         args = parser.parse_args()
 
-        print("Using Twisted reactor {0}".format(reactor.__class__)) #@UndefinedVariable
+        print('Using Twisted reactor {0}'.format(reactor.__class__)) #@UndefinedVariable
         
         alarms = Alarms(args.save)
     
@@ -475,15 +475,15 @@ def main(argv=None): # IGNORE:C0111
         loop = task.LoopingCall(serialProtocol.sendState)
 
         def cbLoopDone(result):
-            """
+            '''
             Called when loop was stopped with success.
-            """
-            print("Loop done: " + result)
+            '''
+            print('Loop done: ' + result)
         
         def ebLoopFailed(failure):
-            """
+            '''
             Called when loop execution failed.
-            """
+            '''
             print(failure.getBriefTraceback())
             
         # Start looping every 10 seconds.
@@ -500,11 +500,11 @@ def main(argv=None): # IGNORE:C0111
     except KeyboardInterrupt:
         return 0
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     if DEBUG:
-        sys.argv.append("-h")
-        sys.argv.append("-v")
-        sys.argv.append("-r")
+        sys.argv.append('-h')
+        sys.argv.append('-v')
+        sys.argv.append('-r')
     if TESTRUN:
         import doctest
         doctest.testmod()
@@ -513,7 +513,7 @@ if __name__ == "__main__":
         import pstats
         profile_filename = 'alarmclock_profile.txt'
         cProfile.run('main()', profile_filename)
-        statsfile = open("profile_stats.txt", "wb")
+        statsfile = open('profile_stats.txt', 'wb')
         p = pstats.Stats(profile_filename, stream=statsfile)
         stats = p.strip_dirs().sort_stats('cumulative')
         stats.print_stats()
