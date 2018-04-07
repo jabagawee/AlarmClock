@@ -42,7 +42,7 @@ class Alarms(object):
 
     def reschedule_all(self, crontabs):
         crontabs = [crontab.strip() for crontab in crontabs]
-        sys.stdout.write('Rescheduling new alarms:\n  %s\n' % ('\n  '.join(crontabs),))
+        sys.stdout.write('Rescheduling new alarms:\n  %s\n' % '\n  '.join(crontabs))
         self._alarms = [Alarm(crontab) for crontab in crontabs]
         if self._save_path:
             try:
