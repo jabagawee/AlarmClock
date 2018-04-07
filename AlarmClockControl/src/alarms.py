@@ -6,7 +6,7 @@ import sys
 from crontab import CronTab
 
 
-class Alarm(object):
+class _Alarm(object):
     '''A single (possibly recurring) alarm.'''
 
     def __init__(self, crontab):
@@ -30,7 +30,7 @@ class Alarms(object):
             self._save_path = save_path
             try:
                 with open(self._save_path) as f:
-                    self._alarms = [Alarm(line.strip())
+                    self._alarms = [_Alarm(line.strip())
                                     for line in f.readlines()
                                     if not line.startswith('#')]
             except Exception:
@@ -48,7 +48,7 @@ class Alarms(object):
         for crontab in crontabs:
             sys.stdout.write('  %s\n' % crontab)
 
-        self._alarms = [Alarm(crontab) for crontab in crontabs]
+        self._alarms = [_Alarm(crontab) for crontab in crontabs]
         if self._save_path:
             try:
                 with open(self._save_path, 'w') as f:
