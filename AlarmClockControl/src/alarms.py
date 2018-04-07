@@ -36,13 +36,18 @@ class Alarms(object):
             except Exception:
                 sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
             else:
-                sys.stdout.write('Loaded %s alarms from save file %s:\n  %s\n' %
-                                 (len(self._alarms), self._save_path,
-                                  '\n  '.join(alarm.get_crontab() for alarm in self._alarms)))
+                sys.stdout.write('Loaded %s alarms from save file %s:\n' %
+                                 (len(self._alarms), self._save_path))
+                for alarm in self._alarms:
+                    sys.stdout.write('  %s\n' % alarm.get_crontab())
 
     def reschedule_all(self, crontabs):
         crontabs = [crontab.strip() for crontab in crontabs]
-        sys.stdout.write('Rescheduling new alarms:\n  %s\n' % '\n  '.join(crontabs))
+
+        sys.stdout.write('Rescheduling new alarms:\n')
+        for crontab in crontabs:
+            sys.stdout.write('  %s\n' % crontab)
+
         self._alarms = [Alarm(crontab) for crontab in crontabs]
         if self._save_path:
             try:
