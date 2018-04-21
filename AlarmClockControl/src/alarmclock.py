@@ -332,12 +332,13 @@ class WebInterface(resource.Resource):
         self._serialProtocol = serialProtocol
 
     def render_GET(self, request):
-        return self._render_form(
+        return self._render_form(request)
+
+    def _render_form(self, request):
+        num_alarms_display = (
             int(request.args['showalarms'.encode('utf-8')][0].decode('utf-8'))
             if 'showalarms'.encode('utf-8') in request.args.keys()
             else NUM_ALARMS_DISPLAY)
-
-    def _render_form(self, num_alarms_display):
         page = ['<html>',
                 '<head>',
                 '  <script>',
@@ -410,7 +411,7 @@ class WebInterface(resource.Resource):
                       if arg.startswith('alarm'.encode('utf-8'))]
         self._alarms.reschedule_all(new_alarms)
         self._serialProtocol.rescheduleAlarm()
-        return self._render_form()
+        return self._render_form(request)
 
 
 def main(argv=None):  # IGNORE:C0111
