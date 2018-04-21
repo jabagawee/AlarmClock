@@ -16,8 +16,8 @@ alarmclock is a script to control an Arduino/Raspberry Pi alarm clock.
 
 import datetime
 import mpd
-# import os
 import sys
+import textwrap
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
@@ -57,10 +57,11 @@ def mpdConnect():
     client = mpd.MPDClient()
     client.timeout = 10
     client.idletimeout = None
-    client.connect("localhost", 6600)
+    client.connect('localhost', 6600)
     print(client.mpd_version)
     print(client.status())
     return client
+
 
 def playKqed(client):
     client.clear()
@@ -68,25 +69,25 @@ def playKqed(client):
     client.play()
     print(client.status())
     print(client.playlist())
-    
+
+
 def stopPlaying(client):
     client.stop()
     print(client.status())
 
+
 def mpdClose(client):
     client.close()
-    client.disconnect()  
+    client.disconnect()
 
 
 class Alarm(object):
-    """
-    A single (possibly recurring) alarm.
-    """
-    
+    '''A single (possibly recurring) alarm.'''
+
     def __init__(self, crontab):
         self._crontab = crontab
         self._alarm = CronTab(crontab)
-    
+
     def next(self, now=None):
         if now is None:
             return self._alarm.next(default_utc=False)
@@ -98,10 +99,8 @@ class Alarm(object):
 
 
 class Alarms(object):
-    """
-    Container for multiple recurring alarms.
-    """
-    
+    '''Container for multiple recurring alarms.'''
+
     def __init__(self, save_path):
         self._save_path = None
         self._alarms = []
@@ -112,13 +111,13 @@ class Alarms(object):
                     self._alarms = [Alarm(line.strip())
                                     for line in f.readlines()
                                     if not line.startswith('#')]
-            except:
+            except Exception:
                 sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
             else:
                 sys.stdout.write('Loaded %s alarms from save file %s:\n  %s\n' %
                                  (len(self._alarms), self._save_path,
                                   '\n  '.join(alarm.get_crontab() for alarm in self._alarms)))
-    
+
     def reschedule_all(self, alarms):
         sys.stdout.write('Rescheduling new alarms:\n  %s\n' %
                          ('\n  '.join(alarm.strip() for alarm in alarms),))
@@ -131,7 +130,7 @@ class Alarms(object):
                         f.write(alarm.get_crontab() + '\n')
                 sys.stdout.write('Wrote %s alarms to save file %s\n' %
                                  (len(self._alarms), self._save_path))
-            except:
+            except Exception:
                 sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
 
     def next_alarm(self):
@@ -152,16 +151,14 @@ class Alarms(object):
 
     def num_alarms(self):
         return len(self._alarms)
-    
+
     def get_alarm_crontabs(self):
         return [alarm.get_crontab() for alarm in self._alarms]
-    
+
 
 class SerialProtocol(LineReceiver):
-    """
-    Arduino serial communication protocol.
-    """
-    
+    '''Arduino serial communication protocol.'''
+
     def __init__(self, mpd, alarms):
         super(SerialProtocol, self).__init__()
         self.mpd = mpd
@@ -174,25 +171,25 @@ class SerialProtocol(LineReceiver):
         self.snooze_time = None
         self.alarm_off_time = None
         self.alarm_time = None
-        
+
     def connectionMade(self):
         print('Serial port connected.')
         self.rescheduleAlarm()
         self.sendState()
-        
+
     def rescheduleAlarm(self):
         if self.alarm_time is not None and self.alarm_time.active():
             self.alarm_time.cancel()
         next_alarm = self.alarms.next_alarm()
         sys.stdout.write('Scheduling next alarm in: ' + str(next_alarm) + ' seconds\n')
-        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds) #@UndefinedVariable
+        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds)  # @UndefinedVariable
 
     def lineReceived(self, line):
-        print("Serial RX: {0}".format(line))
+        print('Serial RX: {0}'.format(line))
         if line[:1] == SLEEP_BUTTON:
             if self.state == OFF:
                 self.state = SLEEP
-                self.sleep_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off)  # @UndefinedVariable
                 self.relay = True
                 self.buzzer = False
                 self.lights = False
@@ -205,7 +202,7 @@ class SerialProtocol(LineReceiver):
             elif self.state == SLEEP:
                 if self.sleep_time is not None and self.sleep_time.active():
                     self.sleep_time.cancel()
-                self.sleep_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
+                self.sleep_time = reactor.callLater(3600.0, self.everything_off)  # @UndefinedVariable
             elif self.state == ALARM or self.state == SNOOZE:
                 self.state = OFF
                 if self.alarm_off_time is not None and self.alarm_off_time.active():
@@ -223,13 +220,13 @@ class SerialProtocol(LineReceiver):
                     client = mpdConnect()
                     stopPlaying(client)
                     mpdClose(client)
-                
+
         if line[:1] == SNOOZE_BUTTON:
             if self.state == ALARM:
                 self.state = SNOOZE
                 if self.snooze_time is not None and self.snooze_time.active():
                     self.snooze_time.cancel()
-                self.snooze_time = reactor.callLater(540.0, self.snooze_over) #@UndefinedVariable
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over)  # @UndefinedVariable
                 self.relay = False
                 self.buzzer = False
                 self.lights = False
@@ -242,7 +239,7 @@ class SerialProtocol(LineReceiver):
             elif self.state == SNOOZE:
                 if self.snooze_time is not None and self.snooze_time.active():
                     self.snooze_time.cancel()
-                self.snooze_time = reactor.callLater(540.0, self.snooze_over) #@UndefinedVariable
+                self.snooze_time = reactor.callLater(540.0, self.snooze_over)  # @UndefinedVariable
             elif self.state == SLEEP:
                 self.state = OFF
                 if self.sleep_time is not None and self.sleep_time.active():
@@ -264,7 +261,7 @@ class SerialProtocol(LineReceiver):
             sys.stderr.write('Bad state ' + str(self.state) + ', expected ' + str(OFF))
             return
         self.state = ALARM
-        self.alarm_off_time = reactor.callLater(3600.0, self.everything_off) #@UndefinedVariable
+        self.alarm_off_time = reactor.callLater(3600.0, self.everything_off)  # @UndefinedVariable
         self.relay = True
         self.buzzer = True
         self.lights = True
@@ -318,9 +315,9 @@ class SerialProtocol(LineReceiver):
             mpdClose(client)
 
     def sendState(self):
-        """
+        '''
         This method is exported as RPC and can be called by connected clients
-        """
+        '''
         new_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(int(self.relay)) + str(int(self.buzzer)) + str(int(self.lights)) + '\n'
         sys.stdout.write('Sending time: ' + new_time)
         self.transport.write(new_time.encode('utf-8'))
@@ -328,7 +325,7 @@ class SerialProtocol(LineReceiver):
 
 class WebInterface(resource.Resource):
     isLeaf = True
-    
+
     def __init__(self, alarms, serialProtocol):
         super(WebInterface, self).__init__()
         self._alarms = alarms
@@ -345,34 +342,34 @@ class WebInterface(resource.Resource):
                 '<head>',
                 '  <script>',
                 'var nextRowId = %s;' % self._alarms.num_alarms(),
-                """
-function appendRow() {
-  var ul = document.getElementById("alarms");
+                '''\
+                function appendRow() {
+                var ul = document.getElementById("alarms");
 
-  var li = document.createElement("li");
-  li.id = "row" + nextRowId;
+                var li = document.createElement("li");
+                li.id = "row" + nextRowId;
 
-  var input = document.createElement("input");
-  input.type = "text";
-  input.name = "alarm" + nextRowId;
-  input.value = "* * * * *";
-  li.appendChild(input);
+                var input = document.createElement("input");
+                input.type = "text";
+                input.name = "alarm" + nextRowId;
+                input.value = "* * * * *";
+                li.appendChild(input);
 
-  var button = document.createElement("input");
-  button.type = "button";
-  button.value = "Delete";
-  button.setAttribute("onClick", "deleteRow(" + nextRowId + ")");
-  li.appendChild(button);
+                var button = document.createElement("input");
+                button.type = "button";
+                button.value = "Delete";
+                button.setAttribute("onClick", "deleteRow(" + nextRowId + ")");
+                li.appendChild(button);
 
-  ul.appendChild(li);
-  nextRowId = nextRowId + 1;
-}
+                ul.appendChild(li);
+                nextRowId = nextRowId + 1;
+                }
 
-function deleteRow(rowNum) {
-  var row = document.getElementById("row" + rowNum);
-  row.parentNode.removeChild(row);
-}
-                """,
+                function deleteRow(rowNum) {
+                var row = document.getElementById("row" + rowNum);
+                row.parentNode.removeChild(row);
+                }
+                ''',
                 '  </script>',
                 '</head>',
                 '<body>',
@@ -392,7 +389,7 @@ function deleteRow(rowNum) {
 
         now = datetime.datetime.now()
         page.append('  <p>Current time: %s</p>' % now.strftime('%I:%M:%S %p %A, %B %d, %Y'))
-        
+
         page.extend([
             '  <p>Next %s alarms:</p>' % num_alarms_display,
             '  <ul>'])
@@ -416,7 +413,7 @@ function deleteRow(rowNum) {
         return self._render_form()
 
 
-def main(argv=None): # IGNORE:C0111
+def main(argv=None):  # IGNORE:C0111
     '''Command line options.'''
 
     if argv is None:
@@ -424,53 +421,46 @@ def main(argv=None): # IGNORE:C0111
     else:
         sys.argv.extend(argv)
 
-    # program_name = os.path.basename(sys.argv[0])
-    program_version = "v%s" % __version__
+    program_version = 'v%s' % __version__
     program_build_date = str(__updated__)
     program_version_message = '%%(prog)s %s (%s)' % (program_version, program_build_date)
-    program_shortdesc = __import__('__main__').__doc__.split("\n")[1]
-    program_license = '''%s
+    program_shortdesc = __import__('__main__').__doc__.split('\n')[1]
+    program_license = textwrap.dedent('''\
+    %s
 
-  Created by camrdale on %s.
-  Copyright 2018 camrdale. All rights reserved.
+      Created by camrdale on %s.
+      Copyright 2018 camrdale. All rights reserved.
 
-  Licensed under the Apache License 2.0
-  http://www.apache.org/licenses/LICENSE-2.0
+      Licensed under the Apache License 2.0
+      http://www.apache.org/licenses/LICENSE-2.0
 
-  Distributed on an "AS IS" basis without warranties
-  or conditions of any kind, either express or implied.
+      Distributed on an "AS IS" basis without warranties
+      or conditions of any kind, either express or implied.
 
-USAGE
-''' % (program_shortdesc, str(__date__))
+    USAGE
+    ''' % (program_shortdesc, str(__date__)))
 
     try:
-        # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-s", "--save", dest="save", type=str, default="alarmclock.crontab", help="if set, file to save alarms to [default: %(default)s]")
-        parser.add_argument("-m", "--mpd", dest="mpd", action="store_true", default=False, help="enable MPD server [default: %(default)s]")
-        parser.add_argument("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %(default)s]")
+        parser.add_argument('-s', '--save', dest='save', type=str, default='alarmclock.crontab', help='if set, file to save alarms to [default: %(default)s]')
+        parser.add_argument('-m', '--mpd', dest='mpd', action='store_true', default=False, help='enable MPD server [default: %(default)s]')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='count', help='set verbosity level [default: %(default)s]')
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
-        parser.add_argument("--web", type=int, default=8000,
+        parser.add_argument('--web', type=int, default=8000,
                             help='Web port to use for embedded Web server. Use 0 to disable.')
-        parser.add_argument(dest="port", help="serial port to connect to [default: %(default)s]", nargs='?', default="COM3")
+        parser.add_argument(dest='port', help='serial port to connect to [default: %(default)s]', nargs='?', default='COM3')
 
-        # Process arguments
         args = parser.parse_args()
 
-        #verbose = args.verbose
+        print('Using Twisted reactor {0}'.format(reactor.__class__))  # @UndefinedVariable
 
-        #if verbose > 0:
-        #    print("Verbose mode on")
-
-        print("Using Twisted reactor {0}".format(reactor.__class__)) #@UndefinedVariable
-        
         alarms = Alarms(args.save)
-    
+
         serialProtocol = SerialProtocol(args.mpd, alarms)
-    
+
         # Create embedded web server to manage the alarms.
         if args.web:
-            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol))) #@UndefinedVariable
+            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol)))  # @UndefinedVariable
 
         print('About to open serial port {0} [{1} baud] ..'.format(args.port, 9600))
         try:
@@ -482,44 +472,33 @@ USAGE
         loop = task.LoopingCall(serialProtocol.sendState)
 
         def cbLoopDone(result):
-            """
-            Called when loop was stopped with success.
-            """
-            print("Loop done: " + result)
-        
+            '''Called when loop was stopped with success.'''
+            print('Loop done: ' + result)
+
         def ebLoopFailed(failure):
-            """
-            Called when loop execution failed.
-            """
+            '''Called when loop execution failed.'''
             print(failure.getBriefTraceback())
-            
+
         # Start looping every 10 seconds.
         loopDeferred = loop.start(10.0)
-        
+
         # Add callbacks for stop and failure.
         loopDeferred.addCallback(cbLoopDone)
         loopDeferred.addErrback(ebLoopFailed)
-    
+
         # start the component and the Twisted reactor ..
-        reactor.run() #@UndefinedVariable
-        
+        reactor.run()  # @UndefinedVariable
+
         return 0
     except KeyboardInterrupt:
-        ### handle keyboard interrupt ###
         return 0
-#     except Exception as e:
-#         if DEBUG or TESTRUN:
-#             raise(e)
-#         indent = len(program_name) * " "
-#         sys.stderr.write(program_name + ": " + repr(e) + "\n")
-#         sys.stderr.write(indent + "  for help use --help")
-#         return 2
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     if DEBUG:
-        sys.argv.append("-h")
-        sys.argv.append("-v")
-        sys.argv.append("-r")
+        sys.argv.append('-h')
+        sys.argv.append('-v')
+        sys.argv.append('-r')
     if TESTRUN:
         import doctest
         doctest.testmod()
@@ -528,7 +507,7 @@ if __name__ == "__main__":
         import pstats
         profile_filename = 'alarmclock_profile.txt'
         cProfile.run('main()', profile_filename)
-        statsfile = open("profile_stats.txt", "wb")
+        statsfile = open('profile_stats.txt', 'wb')
         p = pstats.Stats(profile_filename, stream=statsfile)
         stats = p.strip_dirs().sort_stats('cumulative')
         stats.print_stats()
