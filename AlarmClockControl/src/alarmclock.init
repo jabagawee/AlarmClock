@@ -12,11 +12,11 @@
 
 NAME="alarmclock"
 PATH="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin"
-APPDIR="/home/pi"
+APPDIR="/home/pi/AlarmClock/AlarmClockControl/src"
 APPBIN="/usr/bin/python"
 PORT="/dev/ttyACM0"
 SAVEFILE="/var/lib/$NAME/$NAME.crontab"
-APPARGS="/home/pi/alarmclock.py --mpd $PORT --save $SAVEFILE"
+APPARGS="$APPDIR/alarmclock.py --mpd --save $SAVEFILE $PORT"
 USER="pi"
 GROUP="pi"
 LOGS="/var/log/$NAME"
