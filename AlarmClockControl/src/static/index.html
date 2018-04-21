@@ -1,0 +1,22 @@
+<html>
+<head>
+  <link rel="stylesheet" href="alarms.css" />
+  <script src="alarms.js"></script>
+</head>
+
+<body>
+  <p>Current alarms:</p>
+  <form method="POST">
+	  <ul id="alarms">
+	  </ul>
+	  <input type="button" value="Add Alarm" id="append_alarm">
+	  <input type="button" value="Save" id="save_alarms">
+  </form>
+  <p id="current_time"></p>
+  <p>Next <span id="num_alarms_display">?</span> alarms:</p>
+  <ul id="next_alarms">
+  </ul>
+	<p><a id="more_alarms" href="#">Show 10 more alarms</a></p>
+
+</body>
+</html>

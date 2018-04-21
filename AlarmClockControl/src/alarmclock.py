@@ -15,7 +15,9 @@ alarmclock is a script to control an Arduino/Raspberry Pi alarm clock.
 '''
 
 import datetime
+import json
 import mpd
+import os
 import sys
 import textwrap
 
@@ -28,7 +30,9 @@ from twisted.internet import reactor
 from twisted.internet import task
 from twisted.internet.serialport import SerialPort
 from twisted.protocols.basic import LineReceiver
+from twisted.python import log
 from twisted.web import server
+from twisted.web import static
 from twisted.web.server import resource
 
 __all__ = []
@@ -134,7 +138,10 @@ class Alarms(object):
                 sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
 
     def next_alarm(self):
-        return min([alarm.next() for alarm in self._alarms])
+        _next_alarms = [alarm.next() for alarm in self._alarms]
+        if not _next_alarms:
+            return None
+        return min(_next_alarms)
 
     def next_alarms(self, num_alarms, now=None):
         if now is None:
@@ -142,9 +149,10 @@ class Alarms(object):
         result = []
 
         for _ in range(num_alarms):
-            now += datetime.timedelta(seconds=min(
-                alarm.next(now=now)
-                for alarm in self._alarms))
+            _next_alarms = [alarm.next(now=now) for alarm in self._alarms]
+            if not _next_alarms:
+                break
+            now += datetime.timedelta(seconds=min(_next_alarms))
             result.append(now)
 
         return result
@@ -181,8 +189,11 @@ class SerialProtocol(LineReceiver):
         if self.alarm_time is not None and self.alarm_time.active():
             self.alarm_time.cancel()
         next_alarm = self.alarms.next_alarm()
-        sys.stdout.write('Scheduling next alarm in: ' + str(next_alarm) + ' seconds\n')
-        self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds)  # @UndefinedVariable
+        if next_alarm is not None:
+            sys.stdout.write('Scheduling next alarm in: ' + str(next_alarm) + ' seconds\n')
+            self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds)  # @UndefinedVariable
+        else:
+            sys.stdout.write('No alarms to schedule\n')
 
     def lineReceived(self, line):
         print('Serial RX: {0}'.format(line))
@@ -331,87 +342,32 @@ class WebInterface(resource.Resource):
         self._alarms = alarms
         self._serialProtocol = serialProtocol
 
-    def render_GET(self, request):
-        return self._render_form(request)
-
-    def _render_form(self, request):
-        num_alarms_display = (
-            int(request.args['showalarms'.encode('utf-8')][0].decode('utf-8'))
-            if 'showalarms'.encode('utf-8') in request.args.keys()
-            else NUM_ALARMS_DISPLAY)
-        page = ['<html>',
-                '<head>',
-                '  <script>',
-                'var nextRowId = %s;' % self._alarms.num_alarms(),
-                '''\
-                function appendRow() {
-                var ul = document.getElementById("alarms");
-
-                var li = document.createElement("li");
-                li.id = "row" + nextRowId;
-
-                var input = document.createElement("input");
-                input.type = "text";
-                input.name = "alarm" + nextRowId;
-                input.value = "* * * * *";
-                li.appendChild(input);
-
-                var button = document.createElement("input");
-                button.type = "button";
-                button.value = "Delete";
-                button.setAttribute("onClick", "deleteRow(" + nextRowId + ")");
-                li.appendChild(button);
-
-                ul.appendChild(li);
-                nextRowId = nextRowId + 1;
-                }
-
-                function deleteRow(rowNum) {
-                var row = document.getElementById("row" + rowNum);
-                row.parentNode.removeChild(row);
-                }
-                ''',
-                '  </script>',
-                '</head>',
-                '<body>',
-                '  <p>Current alarms:</p>',
-                '  <form method="POST">',
-                '  <ul id="alarms">']
-        i = 0
-        for alarm in self._alarms.get_alarm_crontabs():
-            page.append('    <li id="row%s"><input type="text" name="alarm%s" value="%s"><input type="button" value="Delete" onClick="deleteRow(%s)"></li>' % (i, i, alarm, i))
-            i += 1
-
-        page.extend([
-            '  </ul>',
-            '  <input type="button" value="Add Alarm" onClick="appendRow()">',
-            '  <input type="submit" value="Submit">',
-            '  </form>'])
-
-        now = datetime.datetime.now()
-        page.append('  <p>Current time: %s</p>' % now.strftime('%I:%M:%S %p %A, %B %d, %Y'))
-
-        page.extend([
-            '  <p>Next %s alarms:</p>' % num_alarms_display,
-            '  <ul>'])
-
-        for alarm in self._alarms.next_alarms(num_alarms_display, now=now):
-            page.append('    <li>%s</li>' % alarm.strftime('%I:%M:%S %p %A, %B %d, %Y'))
-        page.extend([
-            '  </ul>',
-            '<p><a href="?showalarms=%s">Show %s more alarms</a></p>' %
-            (num_alarms_display + NUM_ALARMS_DISPLAY, NUM_ALARMS_DISPLAY,),
-            '</body></html>',
-            '</body></html>'])
-        return ('\n'.join(page)).encode('utf-8')
-
     def render_POST(self, request):
-        new_alarms = [request.args[arg][0].decode('utf-8')
-                      for arg in request.args.keys()
-                      if arg.startswith('alarm'.encode('utf-8'))]
-        self._alarms.reschedule_all(new_alarms)
-        self._serialProtocol.rescheduleAlarm()
-        return self._render_form(request)
+        content = request.content.getvalue().decode('utf-8')
+        print('Received content: ' + content)
+        inputData = json.loads(content)
+        print('Received JSON: ' + str(inputData))
+
+        if 'new_alarms' in inputData:
+            self._alarms.reschedule_all(inputData['new_alarms'])
+            self._serialProtocol.rescheduleAlarm()
+        num_alarms_display = inputData.get('num_alarms_display', NUM_ALARMS_DISPLAY)
+        
+        data = {}
+        data['alarms'] = self._alarms.get_alarm_crontabs()
+        now = datetime.datetime.now()
+        data['now'] = now.strftime('%I:%M:%S %p %A, %B %d, %Y')
+        data['num_alarms_display'] = num_alarms_display
+        data['next_alarms'] = [
+            alarm.strftime('%I:%M:%S %p %A, %B %d, %Y')
+            for alarm in self._alarms.next_alarms(num_alarms_display, now=now)]
+
+        print('Sending JSON: ' + str(data))
+        content = json.dumps(data)
+        print('Sending content: ' + content)
+        
+        request.responseHeaders.addRawHeader(b'content-type', b'application/json')
+        return content.encode('utf-8')
 
 
 def main(argv=None):  # IGNORE:C0111
@@ -455,13 +411,18 @@ def main(argv=None):  # IGNORE:C0111
 
         print('Using Twisted reactor {0}'.format(reactor.__class__))  # @UndefinedVariable
 
+        log.startLogging(sys.stdout)
+
         alarms = Alarms(args.save)
 
         serialProtocol = SerialProtocol(args.mpd, alarms)
 
         # Create embedded web server to manage the alarms.
         if args.web:
-            reactor.listenTCP(args.web, server.Site(WebInterface(alarms, serialProtocol)))  # @UndefinedVariable
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            root = static.File(dir_path + '/static/')
+            root.putChild(b'data', WebInterface(alarms, serialProtocol))
+            reactor.listenTCP(args.web, server.Site(root))  # @UndefinedVariable
 
         print('About to open serial port {0} [{1} baud] ..'.format(args.port, 9600))
         try:
