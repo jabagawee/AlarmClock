@@ -20,6 +20,7 @@ import mpd
 import os
 import sys
 import textwrap
+import traceback
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
@@ -88,10 +89,31 @@ def mpdClose(client):
 class Alarm(object):
     '''A single (possibly recurring) alarm.'''
 
-    def __init__(self, crontab):
+    def __init__(self, crontab, buzzer):
         self._crontab = crontab
+        self._buzzer = buzzer
         self._alarm = CronTab(crontab)
 
+    @classmethod
+    def fromSaveString(cls, line):
+        buzzer = False
+        pieces = line.split(',')
+        crontab = pieces[0].strip()
+        if len(pieces) > 1:
+            if pieces[1].strip() != '0':
+                buzzer = True
+        return cls(crontab, buzzer)
+
+    @classmethod
+    def fromJson(cls, json):
+        return cls(json['crontab'], json.get('buzzer', False))
+    
+    def toSaveString(self):
+        return self._crontab + "," + ("1" if self._buzzer else "0")
+
+    def toJson(self):
+        return {'crontab': self._crontab, 'buzzer': self._buzzer} 
+       
     def next(self, now=None):
         if now is None:
             return self._alarm.next(default_utc=False)
@@ -100,6 +122,9 @@ class Alarm(object):
 
     def get_crontab(self):
         return self._crontab
+
+    def get_buzzer(self):
+        return self._buzzer
 
 
 class Alarms(object):
@@ -112,36 +137,39 @@ class Alarms(object):
             self._save_path = save_path
             try:
                 with open(self._save_path) as f:
-                    self._alarms = [Alarm(line.strip())
-                                    for line in f.readlines()
-                                    if not line.startswith('#')]
-            except Exception:
+                    for line in f.readlines():
+                        if line.startswith('#'):
+                            continue
+                        self._alarms.append(Alarm.fromSaveString(line.strip()))
+            except FileNotFoundError:
                 sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
             else:
                 sys.stdout.write('Loaded %s alarms from save file %s:\n  %s\n' %
                                  (len(self._alarms), self._save_path,
-                                  '\n  '.join(alarm.get_crontab() for alarm in self._alarms)))
+                                  '\n  '.join(alarm.toSaveString() for alarm in self._alarms)))
 
     def reschedule_all(self, alarms):
+        self._alarms = [Alarm.fromJson(json) for json in alarms]
         sys.stdout.write('Rescheduling new alarms:\n  %s\n' %
-                         ('\n  '.join(alarm.strip() for alarm in alarms),))
-        self._alarms = [Alarm(alarm.strip()) for alarm in alarms]
+                         ('\n  '.join(alarm.toSaveString() for alarm in self._alarms),))
         if self._save_path:
             try:
                 with open(self._save_path, 'w') as f:
-                    f.write('# m h dom mon dow\n')
+                    f.write('# m h dom mon dow , buzzer\n')
                     for alarm in self._alarms:
-                        f.write(alarm.get_crontab() + '\n')
+                        f.write(alarm.toSaveString() + '\n')
                 sys.stdout.write('Wrote %s alarms to save file %s\n' %
                                  (len(self._alarms), self._save_path))
             except Exception:
+                traceback.print_exc()
                 sys.stderr.write('Failed to write to save file: %s\n' % self._save_path)
 
     def next_alarm(self):
-        _next_alarms = [alarm.next() for alarm in self._alarms]
+        _next_alarms = [(alarm.next(), alarm) for alarm in self._alarms]
         if not _next_alarms:
             return None
-        return min(_next_alarms)
+        _next_alarm = min(_next_alarms)
+        return _next_alarm[1]
 
     def next_alarms(self, num_alarms, now=None):
         if now is None:
@@ -160,8 +188,8 @@ class Alarms(object):
     def num_alarms(self):
         return len(self._alarms)
 
-    def get_alarm_crontabs(self):
-        return [alarm.get_crontab() for alarm in self._alarms]
+    def get_alarm_json(self):
+        return [alarm.toJson() for alarm in self._alarms]
 
 
 class SerialProtocol(LineReceiver):
@@ -179,6 +207,7 @@ class SerialProtocol(LineReceiver):
         self.snooze_time = None
         self.alarm_off_time = None
         self.alarm_time = None
+        self.next_alarm = None
 
     def connectionMade(self):
         print('Serial port connected.')
@@ -188,10 +217,11 @@ class SerialProtocol(LineReceiver):
     def rescheduleAlarm(self):
         if self.alarm_time is not None and self.alarm_time.active():
             self.alarm_time.cancel()
-        next_alarm = self.alarms.next_alarm()
-        if next_alarm is not None:
-            sys.stdout.write('Scheduling next alarm in: ' + str(next_alarm) + ' seconds\n')
-            self.alarm_time = reactor.callLater(next_alarm, self.alarm_sounds)  # @UndefinedVariable
+        self.next_alarm = self.alarms.next_alarm()
+        if self.next_alarm is not None:
+            next_time = self.next_alarm.next()
+            sys.stdout.write('Scheduling next alarm in: ' + str(next_time) + ' seconds\n')
+            self.alarm_time = reactor.callLater(next_time, self.alarm_sounds)  # @UndefinedVariable
         else:
             sys.stdout.write('No alarms to schedule\n')
 
@@ -274,7 +304,7 @@ class SerialProtocol(LineReceiver):
         self.state = ALARM
         self.alarm_off_time = reactor.callLater(3600.0, self.everything_off)  # @UndefinedVariable
         self.relay = True
-        self.buzzer = True
+        self.buzzer = self.next_alarm.get_buzzer()
         self.lights = True
         sys.stdout.write('Turning on alarm\n')
         self.sendState()
@@ -290,7 +320,7 @@ class SerialProtocol(LineReceiver):
         self.state = ALARM
         self.snooze_time = None
         self.relay = True
-        self.buzzer = True
+        self.buzzer = self.next_alarm.get_buzzer()
         self.lights = True
         sys.stdout.write('Resuming alarm after snooze\n')
         self.sendState()
@@ -354,7 +384,7 @@ class WebInterface(resource.Resource):
         num_alarms_display = inputData.get('num_alarms_display', NUM_ALARMS_DISPLAY)
         
         data = {}
-        data['alarms'] = self._alarms.get_alarm_crontabs()
+        data['alarms'] = self._alarms.get_alarm_json()
         now = datetime.datetime.now()
         data['now'] = now.strftime('%I:%M:%S %p %A, %B %d, %Y')
         data['num_alarms_display'] = num_alarms_display

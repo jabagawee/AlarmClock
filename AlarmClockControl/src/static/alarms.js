@@ -1,9 +1,15 @@
+const crontabClassName = "crontabInput";
+const buzzerClassName = "buzzerInput";
+
+const defaultCrontab = "* * * * *";
+const defaultBuzzer = false;
+
 var numAlarmsDisplay = 10;
 
 window.onload = function() {
-    document.getElementById('append_alarm').addEventListener('click', appendRow);
-    document.getElementById('save_alarms').addEventListener('click', saveAlarms);
-    document.getElementById('more_alarms').addEventListener('click', moreAlarms);
+    document.getElementById("append_alarm").addEventListener("click", appendRow);
+    document.getElementById("save_alarms").addEventListener("click", saveAlarms);
+    document.getElementById("more_alarms").addEventListener("click", moreAlarms);
     loadData({});
 }
 
@@ -11,32 +17,33 @@ function saveAlarms(event) {
     var ulAlarms = document.getElementById("alarms");
     var alarms = [];
     
-    var inputs = ulAlarms.getElementsByClassName('alarmInput');
-    for (var i = 0; i < inputs.length; i++) {
-        var input = inputs[i];
-        alarms.push(input.value);
+    var crontabs = ulAlarms.getElementsByClassName(crontabClassName);
+    for (var i = 0; i < crontabs.length; i++) {
+        var crontab = crontabs[i];
+        var buzzer = crontab.parentNode.getElementsByClassName(buzzerClassName)[0];
+        alarms.push({"crontab": crontab.value, "buzzer": buzzer.checked});
     }
-    loadData({'new_alarms': alarms});
+    loadData({"new_alarms": alarms});
 }
 
 function loadData(data) {
-    var url = '/data';
-    data['num_alarms_display'] = numAlarmsDisplay;
+    var url = "/data";
+    data["num_alarms_display"] = numAlarmsDisplay;
 
-    console.log('Sending data:', data);
+    console.log("Sending data:", data);
     fetch(url, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
       headers: new Headers({
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json"
       })
     }).then(res => res.json())
-    .catch(error => console.error('Error loading data:', error))
+    .catch(error => console.error("Error loading data:", error))
     .then(data => updateData(data));
 }
 
 function updateData(data) {
-    console.log('Loaded data:', data);
+    console.log("Loaded data:", data);
 
     var ulAlarms = document.getElementById("alarms");
 
@@ -45,36 +52,23 @@ function updateData(data) {
         ulAlarms.removeChild(ulAlarms.firstChild);
     }
 
-    var alarms = data['alarms'];
+    var alarms = data["alarms"];
     for (var i = 0; i < alarms.length; i++) {
-        var li = document.createElement("li");
-    
-        var input = document.createElement("input");
-        input.classList.add("alarmInput");
-        input.type = "text";
-        input.value = alarms[i];
-        li.appendChild(input);
-    
-        var button = document.createElement("input");
-        button.type = "button";
-        button.value = "Delete";
-        button.addEventListener('click', deleteRow);
-        li.appendChild(button);
-    
-        ulAlarms.appendChild(li);
+        var alarm = alarms[i]
+        ulAlarms.appendChild(createRow(alarm["crontab"], alarm["buzzer"]));
     }
     
     var currentTime = document.getElementById("current_time");
-    currentTime.innerHTML = data['now']
+    currentTime.innerHTML = data["now"]
     
     var numAlarmsDisplay = document.getElementById("num_alarms_display");
-    numAlarmsDisplay.innerHTML = data['num_alarms_display']
+    numAlarmsDisplay.innerHTML = data["num_alarms_display"]
 
     var ulNextAlarms = document.getElementById("next_alarms");
     while (ulNextAlarms.firstChild) {
         ulNextAlarms.removeChild(ulNextAlarms.firstChild);
     }
-    var nextAlarms = data['next_alarms'];
+    var nextAlarms = data["next_alarms"];
     for (var i = 0; i < nextAlarms.length; i++) {
         var li = document.createElement("li");
         li.innerHTML = nextAlarms[i];
@@ -84,22 +78,31 @@ function updateData(data) {
 
 function appendRow(event) {
     var ul = document.getElementById("alarms");
+    ul.appendChild(createRow(defaultCrontab, defaultBuzzer));
+}
 
+function createRow(crontab, buzzer) {
     var li = document.createElement("li");
-
-    var input = document.createElement("input");
-    input.classList.add("alarmInput");
-    input.type = "text";
-    input.value = "* * * * *";
-    li.appendChild(input);
+    
+    var text = document.createElement("input");
+    text.classList.add(crontabClassName);
+    text.type = "text";
+    text.value = crontab;
+    li.appendChild(text);
+    
+    var checkbox = document.createElement("input");
+    checkbox.classList.add(buzzerClassName);
+    checkbox.type = "checkbox";
+    li.appendChild(checkbox);
+    checkbox.checked = buzzer;
 
     var button = document.createElement("input");
     button.type = "button";
     button.value = "Delete";
-    button.addEventListener('click', deleteRow);
+    button.addEventListener("click", deleteRow);
     li.appendChild(button);
-
-    ul.appendChild(li);
+    
+    return li;
 }
 
 function deleteRow(event) {
