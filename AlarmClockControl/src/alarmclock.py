@@ -141,7 +141,7 @@ class Alarms(object):
                         if line.startswith('#'):
                             continue
                         self._alarms.append(Alarm.fromSaveString(line.strip()))
-            except FileNotFoundError:
+            except (OSError, IOError):
                 sys.stdout.write('Ignoring missing save file: %s\n' % self._save_path)
             else:
                 sys.stdout.write('Loaded %s alarms from save file %s:\n  %s\n' %
@@ -196,7 +196,6 @@ class SerialProtocol(LineReceiver):
     '''Arduino serial communication protocol.'''
 
     def __init__(self, mpd, alarms):
-        super(SerialProtocol, self).__init__()
         self.mpd = mpd
         self.alarms = alarms
         self.state = OFF
@@ -368,7 +367,7 @@ class WebInterface(resource.Resource):
     isLeaf = True
 
     def __init__(self, alarms, serialProtocol):
-        super(WebInterface, self).__init__()
+        resource.Resource.__init__(self)
         self._alarms = alarms
         self._serialProtocol = serialProtocol
 
